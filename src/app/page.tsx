@@ -60,7 +60,7 @@ export default function Home() {
   }, [items]);
 
   const filteredItems = useMemo(() => {
-    let result = items;
+    let result = items.filter((i) => !i.is_archived);
 
     if (showUnreadOnly) {
       result = result.filter((i) => !i.is_read);
@@ -122,6 +122,21 @@ export default function Home() {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(updates),
         });
+      } catch {
+        const res = await fetch("/api/items");
+        const data = await res.json();
+        setItems(data);
+      }
+    },
+    []
+  );
+
+  const handleDelete = useCallback(
+    async (id: string) => {
+      setItems((prev) => prev.filter((item) => item.id !== id));
+      setSelectedItemId(null);
+      try {
+        await fetch(`/api/items/${id}`, { method: "DELETE" });
       } catch {
         const res = await fetch("/api/items");
         const data = await res.json();
@@ -207,6 +222,7 @@ export default function Home() {
             threads={threads}
             onClose={() => setSelectedItemId(null)}
             onUpdate={handleUpdate}
+            onDelete={handleDelete}
           />
         )}
       </div>

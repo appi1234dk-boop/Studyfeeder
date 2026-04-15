@@ -42,9 +42,20 @@ export async function getAllItems(): Promise<Item[]> {
   }));
 }
 
+export async function deleteItem(rowIndex: number) {
+  const auth = getAuth();
+  const sheets = google.sheets({ version: "v4", auth });
+  await sheets.spreadsheets.values.update({
+    spreadsheetId: SPREADSHEET_ID,
+    range: `${SHEET_NAME}!K${rowIndex}`,
+    valueInputOption: "RAW",
+    requestBody: { values: [["TRUE"]] },
+  });
+}
+
 export async function updateItem(
   rowIndex: number,
-  updates: { title?: string; ideas?: string; is_read?: boolean; thread?: string }
+  updates: { title?: string; ideas?: string; is_read?: boolean; thread?: string; tags?: string }
 ) {
   const auth = getAuth();
   const sheets = google.sheets({ version: "v4", auth });
@@ -65,6 +76,9 @@ export async function updateItem(
   }
   if (updates.thread !== undefined) {
     requests.push({ range: `${SHEET_NAME}!O${rowIndex}`, values: [[updates.thread]] });
+  }
+  if (updates.tags !== undefined) {
+    requests.push({ range: `${SHEET_NAME}!G${rowIndex}`, values: [[updates.tags]] });
   }
 
   if (requests.length > 0) {

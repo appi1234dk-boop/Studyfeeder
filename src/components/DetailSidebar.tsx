@@ -14,11 +14,17 @@ interface DetailSidebarProps {
   threads: string[];
   onClose: () => void;
   onUpdate: (id: string, updates: Partial<Item>) => void;
+  onDelete: (id: string) => void;
 }
 
 function getYouTubeId(url: string): string | null {
   const m = url.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/)([\w-]+)/);
   return m ? m[1] : null;
+}
+
+function getInstagramEmbedUrl(url: string): string | null {
+  const m = url.match(/instagram\.com\/(?:p|reel)\/([A-Za-z0-9_-]+)/);
+  return m ? `https://www.instagram.com/p/${m[1]}/embed/` : null;
 }
 
 function ImageGallery({ urls }: { urls: string[] }) {
@@ -90,16 +96,22 @@ function ImageGallery({ urls }: { urls: string[] }) {
   );
 }
 
-export default function DetailSidebar({ item, threads, onClose, onUpdate }: DetailSidebarProps) {
+export default function DetailSidebar({ item, threads, onClose, onUpdate, onDelete }: DetailSidebarProps) {
   const [title, setTitle] = useState("");
   const [ideas, setIdeas] = useState("");
   const [threadOpen, setThreadOpen] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [tagInput, setTagInput] = useState("");
+  const [showTagInput, setShowTagInput] = useState(false);
 
   useEffect(() => {
     if (item) {
       setTitle(item.title);
       setIdeas(item.ideas);
       setThreadOpen(false);
+      setShowDeleteConfirm(false);
+      setTagInput("");
+      setShowTagInput(false);
     }
   }, [item]);
 
@@ -116,6 +128,21 @@ export default function DetailSidebar({ item, threads, onClose, onUpdate }: Deta
   const tags = item.tags ? item.tags.split(",").map((t) => t.trim()).filter(Boolean) : [];
   const imageUrls = item.images ? item.images.split(",").map((u) => driveUrlToThumbnail(u.trim())).filter(Boolean) : [];
   const youtubeId = item.type === "youtube" ? getYouTubeId(item.url) : null;
+  const instagramEmbedUrl = item.url ? getInstagramEmbedUrl(item.url) : null;
+
+  const addTag = (tag: string) => {
+    const trimmed = tag.trim();
+    if (!trimmed || tags.includes(trimmed)) return;
+    const newTags = [...tags, trimmed].join(", ");
+    onUpdate(item.id, { tags: newTags } as Partial<Item>);
+    setTagInput("");
+    setShowTagInput(false);
+  };
+
+  const removeTag = (tagToRemove: string) => {
+    const newTags = tags.filter((t) => t !== tagToRemove).join(", ");
+    onUpdate(item.id, { tags: newTags } as Partial<Item>);
+  };
 
   return (
     <div className="w-[600px] bg-white border-l border-[var(--border)] shrink-0 overflow-y-auto flex flex-col">
@@ -170,6 +197,23 @@ export default function DetailSidebar({ item, threads, onClose, onUpdate }: Deta
           </div>
         )}
 
+        {/* Instagram embed */}
+        {instagramEmbedUrl && (
+          <div className="flex flex-col gap-1.5">
+            <label className="text-xs font-semibold uppercase tracking-wide text-[var(--secondary)]">
+              인스타그램
+            </label>
+            <div className="w-full rounded-lg overflow-hidden border border-[var(--border)]">
+              <iframe
+                src={instagramEmbedUrl}
+                className="w-full border-none"
+                style={{ minHeight: "480px" }}
+                allowFullScreen
+              />
+            </div>
+          </div>
+        )}
+
         {/* Images */}
         {imageUrls.length > 0 && (
           <div className="flex flex-col gap-1.5">
@@ -208,20 +252,46 @@ export default function DetailSidebar({ item, threads, onClose, onUpdate }: Deta
         )}
 
         {/* Tags */}
-        {tags.length > 0 && (
-          <div className="flex flex-col gap-1.5">
-            <label className="text-xs font-semibold uppercase tracking-wide text-[var(--secondary)]">
-              태그
-            </label>
-            <div className="flex gap-1.5 flex-wrap">
-              {tags.map((tag) => (
-                <span key={tag} className="text-[13px] px-2.5 py-1 rounded-md bg-gray-100 text-[var(--secondary)]">
-                  {tag}
-                </span>
-              ))}
-            </div>
+        <div className="flex flex-col gap-1.5">
+          <label className="text-xs font-semibold uppercase tracking-wide text-[var(--secondary)]">
+            태그
+          </label>
+          <div className="flex gap-1.5 flex-wrap items-center">
+            {tags.map((tag) => (
+              <span key={tag} className="group text-[13px] px-2.5 py-1 rounded-md bg-gray-100 text-[var(--secondary)] flex items-center gap-1">
+                {tag}
+                <button
+                  className="opacity-0 group-hover:opacity-100 text-gray-400 hover:text-red-500 transition-all text-xs ml-0.5"
+                  onClick={() => removeTag(tag)}
+                  title="태그 삭제"
+                >
+                  &times;
+                </button>
+              </span>
+            ))}
+            {showTagInput ? (
+              <input
+                className="text-[13px] px-2 py-1 border border-[var(--primary)] rounded-md outline-none w-28 bg-white"
+                placeholder="태그 입력"
+                value={tagInput}
+                onChange={(e) => setTagInput(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") addTag(tagInput);
+                  if (e.key === "Escape") { setShowTagInput(false); setTagInput(""); }
+                }}
+                onBlur={() => { if (tagInput.trim()) addTag(tagInput); else setShowTagInput(false); }}
+                autoFocus
+              />
+            ) : (
+              <button
+                className="text-[13px] px-2 py-1 rounded-md border border-dashed border-gray-300 text-[var(--secondary)] hover:border-[var(--primary)] hover:text-[var(--primary)] transition-colors"
+                onClick={() => setShowTagInput(true)}
+              >
+                + 추가
+              </button>
+            )}
           </div>
-        )}
+        </div>
 
         {/* Ideas */}
         <div className="flex flex-col gap-1.5">
@@ -282,6 +352,36 @@ export default function DetailSidebar({ item, threads, onClose, onUpdate }: Deta
             저장일
           </label>
           <div className="text-[13px] text-[var(--secondary)]">{item.created_at}</div>
+        </div>
+
+        {/* Delete */}
+        <div className="pt-4 border-t border-[var(--border)]">
+          {showDeleteConfirm ? (
+            <div className="flex flex-col gap-2">
+              <p className="text-sm text-red-600">정말 이 자료를 삭제하시겠습니까?</p>
+              <div className="flex gap-2">
+                <button
+                  className="flex-1 px-3 py-2 text-sm bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors"
+                  onClick={() => onDelete(item.id)}
+                >
+                  삭제
+                </button>
+                <button
+                  className="flex-1 px-3 py-2 text-sm border border-[var(--border)] rounded-lg hover:bg-gray-50 transition-colors"
+                  onClick={() => setShowDeleteConfirm(false)}
+                >
+                  취소
+                </button>
+              </div>
+            </div>
+          ) : (
+            <button
+              className="w-full px-3 py-2 text-sm text-red-500 border border-red-200 rounded-lg hover:bg-red-50 transition-colors"
+              onClick={() => setShowDeleteConfirm(true)}
+            >
+              자료 삭제
+            </button>
+          )}
         </div>
       </div>
     </div>
