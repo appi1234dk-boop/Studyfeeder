@@ -27,6 +27,16 @@ function getInstagramEmbedUrl(url: string): string | null {
   return m ? `https://www.instagram.com/p/${m[1]}/embed/` : null;
 }
 
+function getLinkedInEmbedUrl(url: string): string | null {
+  // Pattern: linkedin.com/feed/update/urn:li:activity:123456
+  const activityMatch = url.match(/linkedin\.com\/feed\/update\/(urn:li:(?:activity|share):\d+)/);
+  if (activityMatch) return `https://www.linkedin.com/embed/feed/update/${activityMatch[1]}`;
+  // Pattern: linkedin.com/posts/username_...-activity-123...- or -share-123...-
+  const postMatch = url.match(/linkedin\.com\/posts\/[^/]+-(activity|share)-(\d+)-/);
+  if (postMatch) return `https://www.linkedin.com/embed/feed/update/urn:li:${postMatch[1]}:${postMatch[2]}`;
+  return null;
+}
+
 function ImageGallery({ urls }: { urls: string[] }) {
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
 
@@ -129,6 +139,7 @@ export default function DetailSidebar({ item, threads, onClose, onUpdate, onDele
   const imageUrls = item.images ? item.images.split(",").map((u) => driveUrlToThumbnail(u.trim())).filter(Boolean) : [];
   const youtubeId = item.type === "youtube" ? getYouTubeId(item.url) : null;
   const instagramEmbedUrl = item.url ? getInstagramEmbedUrl(item.url) : null;
+  const linkedInUrl = item.url ? getLinkedInEmbedUrl(item.url) : null;
 
   const addTag = (tag: string) => {
     const trimmed = tag.trim();
@@ -214,6 +225,23 @@ export default function DetailSidebar({ item, threads, onClose, onUpdate, onDele
           </div>
         )}
 
+        {/* LinkedIn embed */}
+        {linkedInUrl && (
+          <div className="flex flex-col gap-1.5">
+            <label className="text-xs font-semibold uppercase tracking-wide text-[var(--secondary)]">
+              링크드인
+            </label>
+            <div className="w-full rounded-lg overflow-hidden border border-[var(--border)]">
+              <iframe
+                src={linkedInUrl}
+                className="w-full border-none"
+                style={{ minHeight: "480px" }}
+                allowFullScreen
+              />
+            </div>
+          </div>
+        )}
+
         {/* Images */}
         {imageUrls.length > 0 && (
           <div className="flex flex-col gap-1.5">
@@ -234,7 +262,8 @@ export default function DetailSidebar({ item, threads, onClose, onUpdate, onDele
               href={item.url}
               target="_blank"
               rel="noopener noreferrer"
-              className="text-sm text-[var(--primary)] hover:underline break-all"
+              className="text-sm text-[var(--primary)] hover:underline truncate block"
+              title={item.url}
             >
               {item.url}
             </a>

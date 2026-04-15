@@ -7,6 +7,8 @@ const TYPE_STYLES: Record<string, string> = {
   blog: "bg-orange-50 text-orange-600",
   article: "bg-blue-50 text-blue-600",
   image: "bg-purple-50 text-purple-600",
+  linkedin: "bg-sky-50 text-sky-700",
+  instagram: "bg-pink-50 text-pink-600",
 };
 
 interface ItemCardProps {
@@ -15,7 +17,14 @@ interface ItemCardProps {
   onClick: () => void;
 }
 
+function getDisplayType(item: Item): string {
+  if (item.url && /linkedin\.com/i.test(item.url)) return "linkedin";
+  if (item.url && /instagram\.com/i.test(item.url)) return "instagram";
+  return item.type;
+}
+
 export default function ItemCard({ item, isSelected, onClick }: ItemCardProps) {
+  const displayType = getDisplayType(item);
   const tags = item.tags ? item.tags.split(",").map((t) => t.trim()).filter(Boolean) : [];
   const memoCount = item.ideas ? item.ideas.split("\n").filter(Boolean).length : 0;
   const imageCount = item.images ? item.images.split(",").filter(Boolean).length : 0;
@@ -36,8 +45,8 @@ export default function ItemCard({ item, isSelected, onClick }: ItemCardProps) {
       />
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2 mb-1">
-          <span className={`text-[11px] font-semibold uppercase px-1.5 py-0.5 rounded ${TYPE_STYLES[item.type] || "bg-gray-100 text-gray-500"}`}>
-            {item.type}
+          <span className={`text-[11px] font-semibold uppercase px-1.5 py-0.5 rounded ${TYPE_STYLES[displayType] || "bg-gray-100 text-gray-500"}`}>
+            {displayType}
           </span>
           <span className="text-xs text-[var(--secondary)] ml-auto">
             {item.created_at?.slice(0, 10)}
