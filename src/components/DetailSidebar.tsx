@@ -37,6 +37,46 @@ function getLinkedInEmbedUrl(url: string): string | null {
   return null;
 }
 
+function isLongBlackUrl(url: string): boolean {
+  return /longblack\.co\/note\/\d+/.test(url);
+}
+
+function LongBlackPreview({ url, title, summary }: { url: string; title: string; summary: string }) {
+  return (
+    <div className="flex flex-col gap-1.5">
+      <label className="text-xs font-semibold uppercase tracking-wide text-[var(--secondary)]">
+        롱블랙
+      </label>
+      <a
+        href={url}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="block rounded-lg border border-[var(--border)] overflow-hidden hover:border-[var(--primary)] transition-colors group"
+      >
+        <div className="bg-[#1a1a1a] px-4 py-3 flex items-center gap-2">
+          <span className="text-white font-bold text-sm tracking-tight">LONGBLACK</span>
+          <span className="text-gray-400 text-xs">·</span>
+          <span className="text-gray-400 text-xs">노트</span>
+        </div>
+        <div className="px-4 py-3 bg-white">
+          <h4 className="text-sm font-semibold leading-snug mb-1.5 group-hover:text-[var(--primary)] transition-colors line-clamp-2">
+            {title}
+          </h4>
+          {summary && (
+            <p className="text-xs text-[var(--secondary)] leading-relaxed line-clamp-3">
+              {summary}
+            </p>
+          )}
+          <div className="mt-2 text-[11px] text-gray-400 flex items-center gap-1">
+            <span>↗</span>
+            <span>롱블랙에서 읽기</span>
+          </div>
+        </div>
+      </a>
+    </div>
+  );
+}
+
 function ImageGallery({ urls }: { urls: string[] }) {
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
 
@@ -140,6 +180,7 @@ export default function DetailSidebar({ item, threads, onClose, onUpdate, onDele
   const youtubeId = item.type === "youtube" ? getYouTubeId(item.url) : null;
   const instagramEmbedUrl = item.url ? getInstagramEmbedUrl(item.url) : null;
   const linkedInUrl = item.url ? getLinkedInEmbedUrl(item.url) : null;
+  const longBlack = item.url ? isLongBlackUrl(item.url) : false;
 
   const addTag = (tag: string) => {
     const trimmed = tag.trim();
@@ -240,6 +281,11 @@ export default function DetailSidebar({ item, threads, onClose, onUpdate, onDele
               />
             </div>
           </div>
+        )}
+
+        {/* Long Black preview */}
+        {longBlack && (
+          <LongBlackPreview url={item.url} title={item.title} summary={item.summary} />
         )}
 
         {/* Images */}
