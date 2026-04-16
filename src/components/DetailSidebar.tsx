@@ -31,8 +31,8 @@ function getLinkedInEmbedUrl(url: string): string | null {
   // Pattern: linkedin.com/feed/update/urn:li:activity:123456
   const activityMatch = url.match(/linkedin\.com\/feed\/update\/(urn:li:(?:activity|share):\d+)/);
   if (activityMatch) return `https://www.linkedin.com/embed/feed/update/${activityMatch[1]}`;
-  // Pattern: linkedin.com/posts/username_...-activity-123...- or -share-123...-
-  const postMatch = url.match(/linkedin\.com\/posts\/[^/]+-(activity|share)-(\d+)-/);
+  // Pattern: linkedin.com/posts/username_...-activity-123...- or -share-123...- or -ugcPost-123...-
+  const postMatch = url.match(/linkedin\.com\/posts\/[^/]+-(activity|share|ugcPost)-(\d+)-/);
   if (postMatch) return `https://www.linkedin.com/embed/feed/update/urn:li:${postMatch[1]}:${postMatch[2]}`;
   return null;
 }
