@@ -41,6 +41,10 @@ function isLongBlackUrl(url: string): boolean {
   return /longblack\.co\/note\/\d+/.test(url);
 }
 
+function isYouTubePostUrl(url: string): boolean {
+  return /youtube\.com\/post\//.test(url);
+}
+
 function LongBlackPreview({ url, title, summary }: { url: string; title: string; summary: string }) {
   return (
     <div className="flex flex-col gap-1.5">
@@ -70,6 +74,45 @@ function LongBlackPreview({ url, title, summary }: { url: string; title: string;
           <div className="mt-2 text-[11px] text-gray-400 flex items-center gap-1">
             <span>↗</span>
             <span>롱블랙에서 읽기</span>
+          </div>
+        </div>
+      </a>
+    </div>
+  );
+}
+
+function YouTubePostPreview({ url, title, summary }: { url: string; title: string; summary: string }) {
+  return (
+    <div className="flex flex-col gap-1.5">
+      <label className="text-xs font-semibold uppercase tracking-wide text-[var(--secondary)]">
+        YouTube 커뮤니티
+      </label>
+      <a
+        href={url}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="block rounded-lg border border-[var(--border)] overflow-hidden hover:border-[var(--primary)] transition-colors group"
+      >
+        <div className="bg-[#FF0000] px-4 py-3 flex items-center gap-2">
+          <span className="inline-flex items-center justify-center w-5 h-5 bg-white rounded-sm">
+            <span className="text-[#FF0000] text-[10px] leading-none">&#9654;</span>
+          </span>
+          <span className="text-white font-bold text-sm tracking-tight">YouTube</span>
+          <span className="text-white/70 text-xs">·</span>
+          <span className="text-white/90 text-xs">커뮤니티 포스트</span>
+        </div>
+        <div className="px-4 py-3 bg-white">
+          <h4 className="text-sm font-semibold leading-snug mb-1.5 group-hover:text-[var(--primary)] transition-colors line-clamp-2">
+            {title}
+          </h4>
+          {summary && (
+            <p className="text-xs text-[var(--secondary)] leading-relaxed line-clamp-3">
+              {summary}
+            </p>
+          )}
+          <div className="mt-2 text-[11px] text-gray-400 flex items-center gap-1">
+            <span>↗</span>
+            <span>YouTube에서 열기</span>
           </div>
         </div>
       </a>
@@ -181,6 +224,7 @@ export default function DetailSidebar({ item, threads, onClose, onUpdate, onDele
   const instagramEmbedUrl = item.url ? getInstagramEmbedUrl(item.url) : null;
   const linkedInUrl = item.url ? getLinkedInEmbedUrl(item.url) : null;
   const longBlack = item.url ? isLongBlackUrl(item.url) : false;
+  const youtubePost = item.url ? isYouTubePostUrl(item.url) : false;
 
   const addTag = (tag: string) => {
     const trimmed = tag.trim();
@@ -286,6 +330,11 @@ export default function DetailSidebar({ item, threads, onClose, onUpdate, onDele
         {/* Long Black preview */}
         {longBlack && (
           <LongBlackPreview url={item.url} title={item.title} summary={item.summary} />
+        )}
+
+        {/* YouTube 커뮤니티 포스트 preview */}
+        {youtubePost && (
+          <YouTubePostPreview url={item.url} title={item.title} summary={item.summary} />
         )}
 
         {/* Images */}
