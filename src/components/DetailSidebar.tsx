@@ -247,6 +247,7 @@ export default function DetailSidebar({ item, threads, onClose, onUpdate, onDele
 
   if (!item) return null;
 
+  const hasMemo = Boolean((item.ideas || "").trim());
   const tags = item.tags ? item.tags.split(",").map((t) => t.trim()).filter(Boolean) : [];
   const imageUrls = item.images ? item.images.split(",").map((u) => driveUrlToThumbnail(u.trim())).filter(Boolean) : [];
   const youtubeId = item.type === "youtube" ? getYouTubeId(item.url) : null;
@@ -364,24 +365,26 @@ export default function DetailSidebar({ item, threads, onClose, onUpdate, onDele
           )}
         </div>
 
-        {/* Ideas — primary */}
-        <div className="flex flex-col gap-1.5">
-          <label className="text-xs font-semibold uppercase tracking-wide text-[var(--secondary)]">
-            💡 내 메모
-          </label>
-          <textarea
-            className="w-full min-h-[200px] border border-[var(--border)] rounded-lg p-3 text-sm leading-relaxed outline-none resize-y focus:border-[var(--primary)] transition-colors"
-            placeholder="이 자료를 보고 느낀 점, 떠오른 아이디어, 적용할 곳을 적어보세요..."
-            value={ideas}
-            onChange={(e) => setIdeas(e.target.value)}
-            onBlur={() => {
-              if (ideas !== item.ideas) {
-                saveField("ideas", ideas);
-                requestRatingSuggestion();
-              }
-            }}
-          />
-        </div>
+        {/* Ideas — only when memo exists (placed before content) */}
+        {hasMemo && (
+          <div className="flex flex-col gap-1.5">
+            <label className="text-xs font-semibold uppercase tracking-wide text-[var(--secondary)]">
+              💡 내 메모
+            </label>
+            <textarea
+              className="w-full min-h-[200px] border border-[var(--border)] rounded-lg p-3 text-sm leading-relaxed outline-none resize-y focus:border-[var(--primary)] transition-colors"
+              placeholder="이 자료를 보고 느낀 점, 떠오른 아이디어, 적용할 곳을 적어보세요..."
+              value={ideas}
+              onChange={(e) => setIdeas(e.target.value)}
+              onBlur={() => {
+                if (ideas !== item.ideas) {
+                  saveField("ideas", ideas);
+                  requestRatingSuggestion();
+                }
+              }}
+            />
+          </div>
+        )}
 
         {/* Tags */}
         <div className="flex flex-col gap-1.5">
@@ -464,18 +467,20 @@ export default function DetailSidebar({ item, threads, onClose, onUpdate, onDele
           </div>
         </div>
 
-        {/* Original content — collapsible */}
-        <div className="pt-4 border-t border-[var(--border)]">
-          <button
-            className="w-full flex items-center justify-between text-xs font-semibold uppercase tracking-wide text-[var(--secondary)] hover:text-[var(--foreground)] transition-colors"
-            onClick={() => setShowOriginal(!showOriginal)}
-          >
-            <span>원본 다시보기</span>
-            <span className="text-[10px]">{showOriginal ? "▲ 접기" : "▼ 펼치기"}</span>
-          </button>
-        </div>
+        {/* Original content — collapsible only when memo exists */}
+        {hasMemo && (
+          <div className="pt-4 border-t border-[var(--border)]">
+            <button
+              className="w-full flex items-center justify-between text-xs font-semibold uppercase tracking-wide text-[var(--secondary)] hover:text-[var(--foreground)] transition-colors"
+              onClick={() => setShowOriginal(!showOriginal)}
+            >
+              <span>원본 다시보기</span>
+              <span className="text-[10px]">{showOriginal ? "▲ 접기" : "▼ 펼치기"}</span>
+            </button>
+          </div>
+        )}
 
-        {showOriginal && (
+        {(!hasMemo || showOriginal) && (
           <>
             {/* YouTube embed */}
             {youtubeId && (
@@ -575,6 +580,27 @@ export default function DetailSidebar({ item, threads, onClose, onUpdate, onDele
               </div>
             )}
           </>
+        )}
+
+        {/* Ideas — placed AFTER content when no memo, to encourage writing */}
+        {!hasMemo && (
+          <div className="flex flex-col gap-1.5 pt-4 border-t border-[var(--border)]">
+            <label className="text-xs font-semibold uppercase tracking-wide text-[var(--secondary)]">
+              💡 메모 작성하기
+            </label>
+            <textarea
+              className="w-full min-h-[160px] border border-[var(--border)] rounded-lg p-3 text-sm leading-relaxed outline-none resize-y focus:border-[var(--primary)] transition-colors"
+              placeholder="이 자료를 보고 느낀 점, 떠오른 아이디어, 적용할 곳을 적어보세요..."
+              value={ideas}
+              onChange={(e) => setIdeas(e.target.value)}
+              onBlur={() => {
+                if (ideas !== item.ideas) {
+                  saveField("ideas", ideas);
+                  requestRatingSuggestion();
+                }
+              }}
+            />
+          </div>
         )}
 
         {/* Date */}
