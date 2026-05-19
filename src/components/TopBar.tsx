@@ -243,8 +243,8 @@ export default function TopBar({
         <div className="flex items-center gap-1 border border-[var(--border)] rounded-lg h-9 px-1">
           {([
             { key: null, label: "전체" },
-            { key: 1 as const, label: "★+" },
-            { key: 2 as const, label: "★★+" },
+            { key: 1 as const, label: "★" },
+            { key: 2 as const, label: "★★" },
             { key: 3 as const, label: "★★★" },
           ]).map((opt) => {
             const active = ratingFilter === opt.key;
