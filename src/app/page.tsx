@@ -19,7 +19,8 @@ export default function Home() {
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const [selectedTypes, setSelectedTypes] = useState<string[]>([]);
   const [dateRange, setDateRange] = useState<{ from: string; to: string } | null>(null);
-  const [sortOrder, setSortOrder] = useState<"newest" | "oldest">("newest");
+  const [sortOrder, setSortOrder] = useState<"newest" | "oldest" | "rating">("newest");
+  const [ratingFilter, setRatingFilter] = useState<null | "unrated" | 1 | 2 | 3>(null);
 
   useEffect(() => {
     fetch("/api/items")
@@ -102,14 +103,39 @@ export default function Home() {
       });
     }
 
+    if (ratingFilter !== null) {
+      if (ratingFilter === "unrated") {
+        result = result.filter((i) => (i.value_rating || 0) === 0);
+      } else {
+        result = result.filter((i) => (i.value_rating || 0) >= ratingFilter);
+      }
+    }
+
     result.sort((a, b) => {
       const da = a.created_at || "";
       const db = b.created_at || "";
+      if (sortOrder === "rating") {
+        const diff = (b.value_rating || 0) - (a.value_rating || 0);
+        if (diff !== 0) return diff;
+        return db.localeCompare(da);
+      }
       return sortOrder === "newest" ? db.localeCompare(da) : da.localeCompare(db);
     });
 
     return result;
-  }, [activeItems, showUnreadOnly, selectedThread, searchQuery, selectedTags, selectedTypes, dateRange, sortOrder]);
+  }, [activeItems, showUnreadOnly, selectedThread, searchQuery, selectedTags, selectedTypes, dateRange, sortOrder, ratingFilter]);
+
+  const ratingCounts = useMemo(() => {
+    const c = { unrated: 0, one: 0, two: 0, three: 0 };
+    for (const i of activeItems) {
+      const r = i.value_rating || 0;
+      if (r === 0) c.unrated++;
+      else if (r === 1) c.one++;
+      else if (r === 2) c.two++;
+      else if (r === 3) c.three++;
+    }
+    return c;
+  }, [activeItems]);
 
   const selectedItem = items.find((i) => i.id === selectedItemId) || null;
 
@@ -148,7 +174,7 @@ export default function Home() {
     []
   );
 
-  const hasActiveFilters = searchQuery || selectedTags.length > 0 || selectedTypes.length > 0 || dateRange;
+  const hasActiveFilters = searchQuery || selectedTags.length > 0 || selectedTypes.length > 0 || dateRange || ratingFilter !== null;
 
   const listTitle = showUnreadOnly
     ? "안 읽은 자료"
@@ -181,6 +207,8 @@ export default function Home() {
         onDateRangeChange={setDateRange}
         allTags={allTags}
         allTypes={allTypes}
+        ratingFilter={ratingFilter}
+        onRatingFilterChange={setRatingFilter}
       />
       <div className="flex flex-1 overflow-hidden">
         <Sidebar
@@ -191,6 +219,9 @@ export default function Home() {
           onThreadSelect={setSelectedThread}
           showUnreadOnly={showUnreadOnly}
           onToggleUnread={setShowUnreadOnly}
+          ratingFilter={ratingFilter}
+          onRatingFilterChange={setRatingFilter}
+          ratingCounts={ratingCounts}
         />
         <main className="flex-1 overflow-y-auto p-6">
           {activeTab === "items" ? (
@@ -204,9 +235,13 @@ export default function Home() {
                 </div>
                 <button
                   className="text-[13px] text-[var(--secondary)] border border-[var(--border)] px-3 py-1.5 rounded-md hover:border-[var(--primary)] hover:text-[var(--primary)] transition-colors"
-                  onClick={() => setSortOrder(sortOrder === "newest" ? "oldest" : "newest")}
+                  onClick={() =>
+                    setSortOrder(
+                      sortOrder === "newest" ? "oldest" : sortOrder === "oldest" ? "rating" : "newest"
+                    )
+                  }
                 >
-                  &#8595; {sortOrder === "newest" ? "최신순" : "오래된순"}
+                  &#8595; {sortOrder === "newest" ? "최신순" : sortOrder === "oldest" ? "오래된순" : "별점순"}
                 </button>
               </div>
               {hasActiveFilters && (
@@ -261,6 +296,17 @@ export default function Home() {
                       </button>
                     </span>
                   )}
+                  {ratingFilter !== null && (
+                    <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs bg-amber-50 text-amber-700 border border-amber-200">
+                      재가치: {ratingFilter === "unrated" ? "미평가" : ratingFilter === 3 ? "★★★" : ratingFilter === 2 ? "★★ 이상" : "★ 이상"}
+                      <button
+                        className="ml-0.5 hover:text-[var(--danger)] transition-colors"
+                        onClick={() => setRatingFilter(null)}
+                      >
+                        ✕
+                      </button>
+                    </span>
+                  )}
                   <button
                     className="px-2.5 py-1 rounded-full text-xs text-[var(--secondary)] hover:text-[var(--danger)] hover:bg-red-50 transition-colors"
                     onClick={() => {
@@ -268,6 +314,7 @@ export default function Home() {
                       setSelectedTags([]);
                       setSelectedTypes([]);
                       setDateRange(null);
+                      setRatingFilter(null);
                     }}
                   >
                     전체 해제

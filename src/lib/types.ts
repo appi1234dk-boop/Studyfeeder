@@ -15,5 +15,6 @@ export interface Item {
   source: string;
   thread: string;
   images: string;
+  value_rating: number;
   rowIndex: number;
 }

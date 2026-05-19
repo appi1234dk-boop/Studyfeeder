@@ -2,6 +2,8 @@
 
 import type { Item } from "@/lib/types";
 
+type RatingFilter = null | "unrated" | 1 | 2 | 3;
+
 interface SidebarProps {
   items: Item[];
   activeTab: "items" | "stats";
@@ -10,6 +12,9 @@ interface SidebarProps {
   onThreadSelect: (thread: string | null) => void;
   showUnreadOnly: boolean;
   onToggleUnread: (v: boolean) => void;
+  ratingFilter: RatingFilter;
+  onRatingFilterChange: (r: RatingFilter) => void;
+  ratingCounts: { unrated: number; one: number; two: number; three: number };
 }
 
 export default function Sidebar({
@@ -20,6 +25,9 @@ export default function Sidebar({
   onThreadSelect,
   showUnreadOnly,
   onToggleUnread,
+  ratingFilter,
+  onRatingFilterChange,
+  ratingCounts,
 }: SidebarProps) {
   const totalCount = items.length;
   const unreadCount = items.filter((i) => !i.is_read).length;
@@ -100,6 +108,45 @@ export default function Sidebar({
             {unreadCount}
           </span>
         </button>
+      </div>
+
+      {/* Rating */}
+      <div className="p-4 pt-0">
+        <div className="text-[11px] font-semibold uppercase tracking-wide text-[var(--secondary)] mb-2">
+          재가치
+        </div>
+        {([
+          { key: 3 as const, label: "★★★ 자주 보기", count: ratingCounts.three },
+          { key: 2 as const, label: "★★ 다시 보고 싶음", count: ratingCounts.two },
+          { key: 1 as const, label: "★ 1회독", count: ratingCounts.one },
+          { key: "unrated" as const, label: "미평가", count: ratingCounts.unrated },
+        ]).map((opt) => {
+          const active = ratingFilter === opt.key;
+          return (
+            <button
+              key={String(opt.key)}
+              className={`w-full flex items-center justify-between px-3 py-2 rounded-lg text-sm transition-colors ${
+                active
+                  ? "bg-[var(--primary-light)] text-[var(--primary)] font-medium"
+                  : "hover:bg-[var(--background)]"
+              }`}
+              onClick={() => onRatingFilterChange(active ? null : opt.key)}
+            >
+              <span className={opt.key === "unrated" ? "text-[var(--secondary)]" : "text-amber-600"}>
+                {opt.label}
+              </span>
+              <span
+                className={`text-xs px-2 py-0.5 rounded-full ${
+                  active
+                    ? "bg-[var(--primary)]/15 text-[var(--primary)]"
+                    : "bg-gray-100 text-[var(--secondary)]"
+                }`}
+              >
+                {opt.count}
+              </span>
+            </button>
+          );
+        })}
       </div>
 
       {/* Threads */}

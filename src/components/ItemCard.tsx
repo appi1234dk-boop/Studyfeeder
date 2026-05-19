@@ -23,10 +23,21 @@ function getDisplayType(item: Item): string {
   return item.type;
 }
 
+function RatingStars({ rating }: { rating: number }) {
+  if (!rating || rating < 1) return null;
+  return (
+    <span className="text-[12px] text-amber-500 leading-none" aria-label={`재가치 ${rating}점`}>
+      {"★".repeat(Math.min(3, rating))}
+    </span>
+  );
+}
+
 export default function ItemCard({ item, isSelected, onClick }: ItemCardProps) {
   const displayType = getDisplayType(item);
   const tags = item.tags ? item.tags.split(",").map((t) => t.trim()).filter(Boolean) : [];
-  const memoCount = item.ideas ? item.ideas.split("\n").filter(Boolean).length : 0;
+  const memoLines = item.ideas ? item.ideas.split("\n").map((s) => s.trim()).filter(Boolean) : [];
+  const hasMemo = memoLines.length > 0;
+  const memoPreview = memoLines.join(" · ");
   const imageCount = item.images ? item.images.split(",").filter(Boolean).length : 0;
 
   return (
@@ -48,14 +59,34 @@ export default function ItemCard({ item, isSelected, onClick }: ItemCardProps) {
           <span className={`text-[11px] font-semibold uppercase px-1.5 py-0.5 rounded ${TYPE_STYLES[displayType] || "bg-gray-100 text-gray-500"}`}>
             {displayType}
           </span>
+          <RatingStars rating={item.value_rating} />
+          {!hasMemo && (
+            <span className="text-[10px] text-amber-600 bg-amber-50 px-1.5 py-0.5 rounded">메모 없음</span>
+          )}
           <span className="text-xs text-[var(--secondary)] ml-auto">
             {item.created_at?.slice(0, 10)}
           </span>
         </div>
         <div className="text-[15px] font-medium mb-1 leading-snug">{item.title || "(제목 없음)"}</div>
-        <div className="text-[13px] text-[var(--secondary)] leading-relaxed line-clamp-2">
-          {item.summary}
-        </div>
+
+        {hasMemo ? (
+          <>
+            <div className="text-[13px] text-[var(--foreground)] leading-relaxed line-clamp-2 flex items-start gap-1.5">
+              <span className="text-amber-500 shrink-0">&#128161;</span>
+              <span className="flex-1">{memoPreview}</span>
+            </div>
+            {item.summary && (
+              <div className="text-[11px] text-[var(--secondary)] mt-1 line-clamp-1 opacity-70">
+                {item.summary}
+              </div>
+            )}
+          </>
+        ) : (
+          <div className="text-[13px] text-[var(--secondary)] leading-relaxed line-clamp-2">
+            {item.summary}
+          </div>
+        )}
+
         {tags.length > 0 && (
           <div className="flex gap-1.5 mt-2 flex-wrap">
             {tags.map((tag) => (
@@ -69,11 +100,6 @@ export default function ItemCard({ item, isSelected, onClick }: ItemCardProps) {
           {item.thread && (
             <span className="text-[11px] text-[var(--secondary)] flex items-center gap-1">
               &#128206; {item.thread}
-            </span>
-          )}
-          {memoCount > 0 && (
-            <span className="text-[11px] text-[var(--secondary)] flex items-center gap-1">
-              &#128161; 메모 {memoCount}개
             </span>
           )}
           {imageCount > 0 && (

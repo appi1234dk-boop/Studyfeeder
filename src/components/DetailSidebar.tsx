@@ -196,6 +196,8 @@ export default function DetailSidebar({ item, threads, onClose, onUpdate, onDele
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [tagInput, setTagInput] = useState("");
   const [showTagInput, setShowTagInput] = useState(false);
+  const [ratingSuggestion, setRatingSuggestion] = useState<{ rating: number; reason: string } | null>(null);
+  const [showOriginal, setShowOriginal] = useState(true);
 
   useEffect(() => {
     if (item) {
@@ -205,16 +207,43 @@ export default function DetailSidebar({ item, threads, onClose, onUpdate, onDele
       setShowDeleteConfirm(false);
       setTagInput("");
       setShowTagInput(false);
+      setRatingSuggestion(null);
+      setShowOriginal(true);
     }
   }, [item]);
 
   const saveField = useCallback(
-    (field: string, value: string | boolean) => {
+    (field: string, value: string | boolean | number) => {
       if (!item) return;
       onUpdate(item.id, { [field]: value } as Partial<Item>);
     },
     [item, onUpdate]
   );
+
+  const requestRatingSuggestion = useCallback(async () => {
+    if (!item) return;
+    if (item.value_rating > 0) return;
+    const memo = ideas.trim();
+    if (memo.length < 10) return;
+    if (memo === (item.ideas || "").trim()) {
+      // 변경 없으면 호출하지 않음
+      // but if no suggestion yet shown for this memo, allow once
+    }
+    try {
+      const res = await fetch(`/api/items/${item.id}/suggest-rating`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ideas: memo, title: item.title, summary: item.summary }),
+      });
+      if (!res.ok) return;
+      const data = await res.json();
+      if (data && typeof data.rating === "number" && data.rating >= 1 && data.rating <= 3) {
+        setRatingSuggestion({ rating: data.rating, reason: data.reason || "" });
+      }
+    } catch {
+      // ignore
+    }
+  }, [item, ideas]);
 
   if (!item) return null;
 
@@ -277,103 +306,82 @@ export default function DetailSidebar({ item, threads, onClose, onUpdate, onDele
           />
         </div>
 
-        {/* YouTube embed */}
-        {youtubeId && (
-          <div className="flex flex-col gap-1.5">
-            <label className="text-xs font-semibold uppercase tracking-wide text-[var(--secondary)]">
-              영상
-            </label>
-            <div className="w-full aspect-video rounded-lg overflow-hidden bg-black">
-              <iframe
-                src={`https://www.youtube.com/embed/${youtubeId}`}
-                className="w-full h-full border-none"
-                allowFullScreen
-              />
+        {/* Rating */}
+        <div className="flex flex-col gap-1.5">
+          <label className="text-xs font-semibold uppercase tracking-wide text-[var(--secondary)]">
+            재가치
+          </label>
+          <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1">
+              {[1, 2, 3].map((n) => {
+                const active = item.value_rating >= n;
+                return (
+                  <button
+                    key={n}
+                    className={`w-8 h-8 rounded-md flex items-center justify-center text-lg transition-colors ${
+                      active
+                        ? "text-amber-500 hover:text-amber-600"
+                        : "text-gray-300 hover:text-amber-400"
+                    }`}
+                    onClick={() => {
+                      const next = item.value_rating === n ? 0 : n;
+                      saveField("value_rating", next);
+                      setRatingSuggestion(null);
+                    }}
+                    title={`${n}점`}
+                  >
+                    {active ? "★" : "☆"}
+                  </button>
+                );
+              })}
             </div>
+            <span className="text-[12px] text-[var(--secondary)]">
+              {item.value_rating === 0 && "미평가"}
+              {item.value_rating === 1 && "1회독으로 충분"}
+              {item.value_rating === 2 && "다시 보고 싶음"}
+              {item.value_rating === 3 && "자주 보기"}
+            </span>
           </div>
-        )}
-
-        {/* Instagram embed */}
-        {instagramEmbedUrl && (
-          <div className="flex flex-col gap-1.5">
-            <label className="text-xs font-semibold uppercase tracking-wide text-[var(--secondary)]">
-              인스타그램
-            </label>
-            <div className="w-full rounded-lg overflow-hidden border border-[var(--border)]">
-              <iframe
-                src={instagramEmbedUrl}
-                className="w-full border-none"
-                style={{ minHeight: "480px" }}
-                allowFullScreen
-              />
+          {ratingSuggestion && item.value_rating === 0 && (
+            <div className="flex items-center gap-2 mt-1 px-2.5 py-1.5 bg-amber-50 border border-amber-200 rounded-md text-[12px]">
+              <span className="text-amber-700">
+                🤖 AI 추천: {"★".repeat(ratingSuggestion.rating)}{"☆".repeat(3 - ratingSuggestion.rating)}
+                {ratingSuggestion.reason && <span className="text-[var(--secondary)] ml-1">· {ratingSuggestion.reason}</span>}
+              </span>
+              <button
+                className="ml-auto px-2 py-0.5 text-[11px] bg-amber-500 text-white rounded hover:bg-amber-600 transition-colors"
+                onClick={() => { saveField("value_rating", ratingSuggestion.rating); setRatingSuggestion(null); }}
+              >
+                적용
+              </button>
+              <button
+                className="text-[11px] text-[var(--secondary)] hover:text-gray-700"
+                onClick={() => setRatingSuggestion(null)}
+              >
+                ✕
+              </button>
             </div>
-          </div>
-        )}
+          )}
+        </div>
 
-        {/* LinkedIn embed */}
-        {linkedInUrl && (
-          <div className="flex flex-col gap-1.5">
-            <label className="text-xs font-semibold uppercase tracking-wide text-[var(--secondary)]">
-              링크드인
-            </label>
-            <div className="w-full rounded-lg overflow-hidden border border-[var(--border)]">
-              <iframe
-                src={linkedInUrl}
-                className="w-full border-none"
-                style={{ minHeight: "480px" }}
-                allowFullScreen
-              />
-            </div>
-          </div>
-        )}
-
-        {/* Long Black preview */}
-        {longBlack && (
-          <LongBlackPreview url={item.url} title={item.title} summary={item.summary} />
-        )}
-
-        {/* YouTube 커뮤니티 포스트 preview */}
-        {youtubePost && (
-          <YouTubePostPreview url={item.url} title={item.title} summary={item.summary} />
-        )}
-
-        {/* Images */}
-        {imageUrls.length > 0 && (
-          <div className="flex flex-col gap-1.5">
-            <label className="text-xs font-semibold uppercase tracking-wide text-[var(--secondary)]">
-              이미지 ({imageUrls.length}장)
-            </label>
-            <ImageGallery urls={imageUrls} />
-          </div>
-        )}
-
-        {/* URL */}
-        {item.url && (
-          <div className="flex flex-col gap-1.5">
-            <label className="text-xs font-semibold uppercase tracking-wide text-[var(--secondary)]">
-              원본 링크
-            </label>
-            <a
-              href={item.url}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-sm text-[var(--primary)] hover:underline truncate block"
-              title={item.url}
-            >
-              {item.url}
-            </a>
-          </div>
-        )}
-
-        {/* Summary */}
-        {item.summary && (
-          <div className="flex flex-col gap-1.5">
-            <label className="text-xs font-semibold uppercase tracking-wide text-[var(--secondary)]">
-              요약
-            </label>
-            <div className="text-sm leading-relaxed whitespace-pre-wrap">{item.summary}</div>
-          </div>
-        )}
+        {/* Ideas — primary */}
+        <div className="flex flex-col gap-1.5">
+          <label className="text-xs font-semibold uppercase tracking-wide text-[var(--secondary)]">
+            💡 내 메모
+          </label>
+          <textarea
+            className="w-full min-h-[200px] border border-[var(--border)] rounded-lg p-3 text-sm leading-relaxed outline-none resize-y focus:border-[var(--primary)] transition-colors"
+            placeholder="이 자료를 보고 느낀 점, 떠오른 아이디어, 적용할 곳을 적어보세요..."
+            value={ideas}
+            onChange={(e) => setIdeas(e.target.value)}
+            onBlur={() => {
+              if (ideas !== item.ideas) {
+                saveField("ideas", ideas);
+                requestRatingSuggestion();
+              }
+            }}
+          />
+        </div>
 
         {/* Tags */}
         <div className="flex flex-col gap-1.5">
@@ -417,20 +425,6 @@ export default function DetailSidebar({ item, threads, onClose, onUpdate, onDele
           </div>
         </div>
 
-        {/* Ideas */}
-        <div className="flex flex-col gap-1.5">
-          <label className="text-xs font-semibold uppercase tracking-wide text-[var(--secondary)]">
-            메모
-          </label>
-          <textarea
-            className="w-full min-h-[120px] border border-[var(--border)] rounded-lg p-3 text-sm leading-relaxed outline-none resize-y focus:border-[var(--primary)] transition-colors"
-            placeholder="아이디어나 메모를 입력하세요..."
-            value={ideas}
-            onChange={(e) => setIdeas(e.target.value)}
-            onBlur={() => { if (ideas !== item.ideas) saveField("ideas", ideas); }}
-          />
-        </div>
-
         {/* Thread */}
         <div className="flex flex-col gap-1.5">
           <label className="text-xs font-semibold uppercase tracking-wide text-[var(--secondary)]">
@@ -469,6 +463,119 @@ export default function DetailSidebar({ item, threads, onClose, onUpdate, onDele
             )}
           </div>
         </div>
+
+        {/* Original content — collapsible */}
+        <div className="pt-4 border-t border-[var(--border)]">
+          <button
+            className="w-full flex items-center justify-between text-xs font-semibold uppercase tracking-wide text-[var(--secondary)] hover:text-[var(--foreground)] transition-colors"
+            onClick={() => setShowOriginal(!showOriginal)}
+          >
+            <span>원본 다시보기</span>
+            <span className="text-[10px]">{showOriginal ? "▲ 접기" : "▼ 펼치기"}</span>
+          </button>
+        </div>
+
+        {showOriginal && (
+          <>
+            {/* YouTube embed */}
+            {youtubeId && (
+              <div className="flex flex-col gap-1.5">
+                <label className="text-xs font-semibold uppercase tracking-wide text-[var(--secondary)]">
+                  영상
+                </label>
+                <div className="w-full aspect-video rounded-lg overflow-hidden bg-black">
+                  <iframe
+                    src={`https://www.youtube.com/embed/${youtubeId}`}
+                    className="w-full h-full border-none"
+                    allowFullScreen
+                  />
+                </div>
+              </div>
+            )}
+
+            {/* Instagram embed */}
+            {instagramEmbedUrl && (
+              <div className="flex flex-col gap-1.5">
+                <label className="text-xs font-semibold uppercase tracking-wide text-[var(--secondary)]">
+                  인스타그램
+                </label>
+                <div className="w-full rounded-lg overflow-hidden border border-[var(--border)]">
+                  <iframe
+                    src={instagramEmbedUrl}
+                    className="w-full border-none"
+                    style={{ minHeight: "480px" }}
+                    allowFullScreen
+                  />
+                </div>
+              </div>
+            )}
+
+            {/* LinkedIn embed */}
+            {linkedInUrl && (
+              <div className="flex flex-col gap-1.5">
+                <label className="text-xs font-semibold uppercase tracking-wide text-[var(--secondary)]">
+                  링크드인
+                </label>
+                <div className="w-full rounded-lg overflow-hidden border border-[var(--border)]">
+                  <iframe
+                    src={linkedInUrl}
+                    className="w-full border-none"
+                    style={{ minHeight: "480px" }}
+                    allowFullScreen
+                  />
+                </div>
+              </div>
+            )}
+
+            {/* Long Black preview */}
+            {longBlack && (
+              <LongBlackPreview url={item.url} title={item.title} summary={item.summary} />
+            )}
+
+            {/* YouTube 커뮤니티 포스트 preview */}
+            {youtubePost && (
+              <YouTubePostPreview url={item.url} title={item.title} summary={item.summary} />
+            )}
+
+            {/* Images */}
+            {imageUrls.length > 0 && (
+              <div className="flex flex-col gap-1.5">
+                <label className="text-xs font-semibold uppercase tracking-wide text-[var(--secondary)]">
+                  이미지 ({imageUrls.length}장)
+                </label>
+                <ImageGallery urls={imageUrls} />
+              </div>
+            )}
+
+            {/* Summary */}
+            {item.summary && (
+              <div className="flex flex-col gap-1.5">
+                <label className="text-xs font-semibold uppercase tracking-wide text-[var(--secondary)]">
+                  요약
+                </label>
+                <div className="text-sm leading-relaxed whitespace-pre-wrap">{item.summary}</div>
+              </div>
+            )}
+
+            {/* URL */}
+            {item.url && (
+              <div className="flex flex-col gap-1.5">
+                <label className="text-xs font-semibold uppercase tracking-wide text-[var(--secondary)]">
+                  원본 링크
+                </label>
+                <a
+                  href={item.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-sm text-[var(--primary)] hover:underline truncate block"
+                  title={item.url}
+                >
+                  {item.url}
+                </a>
+              </div>
+            )}
+          </>
+        )}
 
         {/* Date */}
         <div className="flex flex-col gap-1.5">

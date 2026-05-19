@@ -17,7 +17,7 @@ export async function getAllItems(): Promise<Item[]> {
   const sheets = google.sheets({ version: "v4", auth });
   const res = await sheets.spreadsheets.values.get({
     spreadsheetId: SPREADSHEET_ID,
-    range: `${SHEET_NAME}!A2:P`,
+    range: `${SHEET_NAME}!A2:Q`,
   });
 
   const rows = res.data.values || [];
@@ -38,6 +38,7 @@ export async function getAllItems(): Promise<Item[]> {
     source: row[13] || "",
     thread: row[14] || "",
     images: row[15] || "",
+    value_rating: parseInt(row[16] || "0", 10) || 0,
     rowIndex: i + 2, // 1-indexed, skip header
   }));
 }
@@ -55,7 +56,14 @@ export async function deleteItem(rowIndex: number) {
 
 export async function updateItem(
   rowIndex: number,
-  updates: { title?: string; ideas?: string; is_read?: boolean; thread?: string; tags?: string }
+  updates: {
+    title?: string;
+    ideas?: string;
+    is_read?: boolean;
+    thread?: string;
+    tags?: string;
+    value_rating?: number;
+  }
 ) {
   const auth = getAuth();
   const sheets = google.sheets({ version: "v4", auth });
@@ -79,6 +87,10 @@ export async function updateItem(
   }
   if (updates.tags !== undefined) {
     requests.push({ range: `${SHEET_NAME}!G${rowIndex}`, values: [[updates.tags]] });
+  }
+  if (updates.value_rating !== undefined) {
+    const r = Math.max(0, Math.min(3, Math.trunc(updates.value_rating)));
+    requests.push({ range: `${SHEET_NAME}!Q${rowIndex}`, values: [[String(r)]] });
   }
 
   if (requests.length > 0) {
