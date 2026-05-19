@@ -309,7 +309,7 @@ export default function DetailSidebar({ item, threads, onClose, onUpdate, onDele
         {/* Rating */}
         <div className="flex flex-col gap-1.5">
           <label className="text-xs font-semibold uppercase tracking-wide text-[var(--secondary)]">
-            재가치
+            콘텐츠 가치
           </label>
           <div className="flex items-center gap-2">
             <div className="flex items-center gap-1">

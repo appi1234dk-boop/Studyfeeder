@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 
-const SYSTEM_PROMPT = `당신은 사용자가 작성한 메모를 보고 "이 자료의 재가치 점수"를 추천합니다.
+const SYSTEM_PROMPT = `당신은 사용자가 작성한 메모를 보고 "이 자료의 콘텐츠 가치 점수"를 추천합니다.
 
 평가 기준:
 - 1점: 메모가 짧고 평이함. 새로운 인사이트나 액션 의도가 없음. ("좋네", "참고용", "ㅇㅋ")

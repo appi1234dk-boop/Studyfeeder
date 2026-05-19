@@ -298,7 +298,7 @@ export default function Home() {
                   )}
                   {ratingFilter !== null && (
                     <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs bg-amber-50 text-amber-700 border border-amber-200">
-                      재가치: {ratingFilter === "unrated" ? "미평가" : ratingFilter === 3 ? "★★★" : ratingFilter === 2 ? "★★ 이상" : "★ 이상"}
+                      콘텐츠 가치: {ratingFilter === "unrated" ? "미평가" : ratingFilter === 3 ? "★★★" : ratingFilter === 2 ? "★★ 이상" : "★ 이상"}
                       <button
                         className="ml-0.5 hover:text-[var(--danger)] transition-colors"
                         onClick={() => setRatingFilter(null)}

@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import type { Item } from "@/lib/types";
 
 const TYPE_STYLES: Record<string, string> = {
@@ -23,37 +24,72 @@ function getDisplayType(item: Item): string {
   return item.type;
 }
 
+function driveUrlToThumbnail(url: string, size = 200): string {
+  const m = url.match(/\/d\/([^/]+)/);
+  if (m) return `https://drive.google.com/thumbnail?id=${m[1]}&sz=w${size}`;
+  return url;
+}
+
+function getThumbnailUrl(item: Item): string | null {
+  if (item.images) {
+    const first = item.images.split(",")[0].trim();
+    if (first) return driveUrlToThumbnail(first, 200);
+  }
+  if (item.url) {
+    const yt = item.url.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/)([\w-]+)/);
+    if (yt) return `https://img.youtube.com/vi/${yt[1]}/mqdefault.jpg`;
+  }
+  return null;
+}
+
 function RatingStars({ rating }: { rating: number }) {
   if (!rating || rating < 1) return null;
   return (
-    <span className="text-[12px] text-amber-500 leading-none" aria-label={`재가치 ${rating}점`}>
+    <span className="text-[12px] text-amber-500 leading-none" aria-label={`콘텐츠 가치 ${rating}점`}>
       {"★".repeat(Math.min(3, rating))}
     </span>
   );
 }
 
 export default function ItemCard({ item, isSelected, onClick }: ItemCardProps) {
+  const [memoExpanded, setMemoExpanded] = useState(false);
   const displayType = getDisplayType(item);
   const tags = item.tags ? item.tags.split(",").map((t) => t.trim()).filter(Boolean) : [];
   const memoLines = item.ideas ? item.ideas.split("\n").map((s) => s.trim()).filter(Boolean) : [];
   const hasMemo = memoLines.length > 0;
-  const memoPreview = memoLines.join(" · ");
+  const memoText = memoLines.join("\n");
+  const memoNeedsToggle = memoLines.length > 2 || memoText.length > 120;
   const imageCount = item.images ? item.images.split(",").filter(Boolean).length : 0;
+  const thumbnail = getThumbnailUrl(item);
 
   return (
-    <button
-      className={`w-full text-left bg-white border rounded-xl px-5 py-4 flex items-start gap-4 transition-all ${
+    <div
+      role="button"
+      tabIndex={0}
+      className={`w-full text-left bg-white border rounded-xl px-5 py-4 flex items-start gap-4 transition-all cursor-pointer ${
         isSelected
           ? "border-[var(--primary)] bg-[var(--primary-light)]"
           : "border-[var(--border)] hover:border-[var(--primary)] hover:shadow-sm"
       }`}
       onClick={onClick}
+      onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onClick(); } }}
     >
       <div
         className={`w-2 h-2 rounded-full mt-[7px] shrink-0 ${
           item.is_read ? "bg-[var(--border)]" : "bg-[var(--primary)]"
         }`}
       />
+
+      {thumbnail && (
+        <img
+          src={thumbnail}
+          alt=""
+          className="w-20 h-20 object-cover rounded-lg shrink-0 border border-[var(--border)] bg-gray-50"
+          loading="lazy"
+          onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }}
+        />
+      )}
+
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2 mb-1">
           <span className={`text-[11px] font-semibold uppercase px-1.5 py-0.5 rounded ${TYPE_STYLES[displayType] || "bg-gray-100 text-gray-500"}`}>
@@ -70,17 +106,31 @@ export default function ItemCard({ item, isSelected, onClick }: ItemCardProps) {
         <div className="text-[15px] font-medium mb-1 leading-snug">{item.title || "(제목 없음)"}</div>
 
         {hasMemo ? (
-          <>
-            <div className="text-[13px] text-[var(--foreground)] leading-relaxed line-clamp-2 flex items-start gap-1.5">
-              <span className="text-amber-500 shrink-0">&#128161;</span>
-              <span className="flex-1">{memoPreview}</span>
+          <div className="mt-1">
+            <div className="flex items-start gap-1.5">
+              <span className="text-amber-500 shrink-0 mt-0.5">&#128161;</span>
+              <div
+                className={`text-[13px] text-[var(--foreground)] leading-relaxed whitespace-pre-line flex-1 overflow-hidden ${
+                  memoExpanded ? "" : "max-h-[4.5em]"
+                }`}
+              >
+                {memoText}
+              </div>
             </div>
+            {memoNeedsToggle && (
+              <button
+                className="text-[11px] text-[var(--primary)] hover:underline mt-1 ml-5"
+                onClick={(e) => { e.stopPropagation(); setMemoExpanded(!memoExpanded); }}
+              >
+                {memoExpanded ? "접기" : `펼치기 (${memoLines.length}줄)`}
+              </button>
+            )}
             {item.summary && (
               <div className="text-[11px] text-[var(--secondary)] mt-1 line-clamp-1 opacity-70">
                 {item.summary}
               </div>
             )}
-          </>
+          </div>
         ) : (
           <div className="text-[13px] text-[var(--secondary)] leading-relaxed line-clamp-2">
             {item.summary}
@@ -109,6 +159,6 @@ export default function ItemCard({ item, isSelected, onClick }: ItemCardProps) {
           )}
         </div>
       </div>
-    </button>
+    </div>
   );
 }

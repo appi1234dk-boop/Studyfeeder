@@ -113,7 +113,7 @@ export default function Sidebar({
       {/* Rating */}
       <div className="p-4 pt-0">
         <div className="text-[11px] font-semibold uppercase tracking-wide text-[var(--secondary)] mb-2">
-          재가치
+          콘텐츠 가치
         </div>
         {([
           { key: 3 as const, label: "★★★ 자주 보기", count: ratingCounts.three },
