@@ -290,6 +290,21 @@ export default function DetailSidebar({ item, threads, onClose, onUpdate, onDele
   const youtubeId = item.type === "youtube" ? getYouTubeId(item.url) : null;
   const instagramEmbedUrl = item.url ? getInstagramEmbedUrl(item.url) : null;
   const linkedInUrl = item.url ? getLinkedInEmbedUrl(item.url) : null;
+  const canEnterNoteMode = !!(onEnterNoteMode && (youtubeId || instagramEmbedUrl || linkedInUrl));
+
+  const noteModeButton = canEnterNoteMode ? (
+    <button
+      className="inline-flex items-center gap-1 text-[12px] font-medium px-2.5 py-1 rounded-md bg-[var(--primary)] text-white hover:bg-blue-600 transition-colors shadow-sm"
+      onClick={onEnterNoteMode}
+      title="좌우 분할 화면으로 영상 보면서 메모하기"
+    >
+      <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+        <path d="M12 20h9" />
+        <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z" />
+      </svg>
+      노트 모드
+    </button>
+  ) : null;
   const longBlack = item.url ? isLongBlackUrl(item.url) : false;
   const youtubePost = item.url ? isYouTubePostUrl(item.url) : false;
 
@@ -405,9 +420,12 @@ export default function DetailSidebar({ item, threads, onClose, onUpdate, onDele
         {/* Ideas — only when memo exists (placed before content) */}
         {hasMemo && (
           <div className="flex flex-col gap-1.5">
-            <label className="text-xs font-semibold uppercase tracking-wide text-[var(--secondary)]">
-              💡 내 메모
-            </label>
+            <div className="flex items-center justify-between gap-2">
+              <label className="text-xs font-semibold uppercase tracking-wide text-[var(--secondary)]">
+                💡 내 메모
+              </label>
+              {noteModeButton}
+            </div>
             <textarea
               className="w-full min-h-[200px] border border-[var(--border)] rounded-lg p-3 text-sm leading-relaxed outline-none resize-y focus:border-[var(--primary)] transition-colors"
               placeholder="이 자료를 보고 느낀 점, 떠오른 아이디어, 적용할 곳을 적어보세요..."
@@ -526,19 +544,9 @@ export default function DetailSidebar({ item, threads, onClose, onUpdate, onDele
             {/* YouTube embed */}
             {youtubeId && (
               <div className="flex flex-col gap-1.5">
-                <div className="flex items-center justify-between gap-2">
-                  <label className="text-xs font-semibold uppercase tracking-wide text-[var(--secondary)]">
-                    영상
-                  </label>
-                  {onEnterNoteMode && (
-                    <button
-                      className="text-[11px] px-2 py-0.5 rounded-md border border-[var(--border)] text-[var(--secondary)] hover:bg-gray-50 hover:text-[var(--primary)] hover:border-[var(--primary)] transition-colors"
-                      onClick={onEnterNoteMode}
-                    >
-                      노트 모드
-                    </button>
-                  )}
-                </div>
+                <label className="text-xs font-semibold uppercase tracking-wide text-[var(--secondary)]">
+                  영상
+                </label>
                 <div className="w-full aspect-video rounded-lg overflow-hidden bg-black">
                   <iframe
                     src={`https://www.youtube.com/embed/${youtubeId}`}
@@ -552,19 +560,9 @@ export default function DetailSidebar({ item, threads, onClose, onUpdate, onDele
             {/* Instagram embed */}
             {instagramEmbedUrl && (
               <div className="flex flex-col gap-1.5">
-                <div className="flex items-center justify-between gap-2">
-                  <label className="text-xs font-semibold uppercase tracking-wide text-[var(--secondary)]">
-                    인스타그램
-                  </label>
-                  {onEnterNoteMode && (
-                    <button
-                      className="text-[11px] px-2 py-0.5 rounded-md border border-[var(--border)] text-[var(--secondary)] hover:bg-gray-50 hover:text-[var(--primary)] hover:border-[var(--primary)] transition-colors"
-                      onClick={onEnterNoteMode}
-                    >
-                      노트 모드
-                    </button>
-                  )}
-                </div>
+                <label className="text-xs font-semibold uppercase tracking-wide text-[var(--secondary)]">
+                  인스타그램
+                </label>
                 <div className="w-full rounded-lg overflow-hidden border border-[var(--border)]">
                   <iframe
                     src={instagramEmbedUrl}
@@ -579,19 +577,9 @@ export default function DetailSidebar({ item, threads, onClose, onUpdate, onDele
             {/* LinkedIn embed */}
             {linkedInUrl && (
               <div className="flex flex-col gap-1.5">
-                <div className="flex items-center justify-between gap-2">
-                  <label className="text-xs font-semibold uppercase tracking-wide text-[var(--secondary)]">
-                    링크드인
-                  </label>
-                  {onEnterNoteMode && (
-                    <button
-                      className="text-[11px] px-2 py-0.5 rounded-md border border-[var(--border)] text-[var(--secondary)] hover:bg-gray-50 hover:text-[var(--primary)] hover:border-[var(--primary)] transition-colors"
-                      onClick={onEnterNoteMode}
-                    >
-                      노트 모드
-                    </button>
-                  )}
-                </div>
+                <label className="text-xs font-semibold uppercase tracking-wide text-[var(--secondary)]">
+                  링크드인
+                </label>
                 <div className="w-full rounded-lg overflow-hidden border border-[var(--border)]">
                   <iframe
                     src={linkedInUrl}
@@ -656,9 +644,12 @@ export default function DetailSidebar({ item, threads, onClose, onUpdate, onDele
         {/* Ideas — placed AFTER content when no memo, to encourage writing */}
         {!hasMemo && (
           <div className="flex flex-col gap-1.5 pt-4 border-t border-[var(--border)]">
-            <label className="text-xs font-semibold uppercase tracking-wide text-[var(--secondary)]">
-              💡 메모 작성하기
-            </label>
+            <div className="flex items-center justify-between gap-2">
+              <label className="text-xs font-semibold uppercase tracking-wide text-[var(--secondary)]">
+                💡 메모 작성하기
+              </label>
+              {noteModeButton}
+            </div>
             <textarea
               className="w-full min-h-[160px] border border-[var(--border)] rounded-lg p-3 text-sm leading-relaxed outline-none resize-y focus:border-[var(--primary)] transition-colors"
               placeholder="이 자료를 보고 느낀 점, 떠오른 아이디어, 적용할 곳을 적어보세요..."
