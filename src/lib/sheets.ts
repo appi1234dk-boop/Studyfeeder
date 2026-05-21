@@ -11,6 +11,7 @@ function getAuth() {
 
 const SPREADSHEET_ID = process.env.GOOGLE_SHEETS_ID!;
 const SHEET_NAME = "자료";
+const OBSIDIAN_QUEUE_SHEET = "obsidian_queue";
 
 export async function getAllItems(): Promise<Item[]> {
   const auth = getAuth();
@@ -102,4 +103,58 @@ export async function updateItem(
       },
     });
   }
+}
+
+async function ensureObsidianQueue() {
+  const auth = getAuth();
+  const sheets = google.sheets({ version: "v4", auth });
+  const meta = await sheets.spreadsheets.get({ spreadsheetId: SPREADSHEET_ID });
+  const exists = (meta.data.sheets || []).some(
+    (s) => s.properties?.title === OBSIDIAN_QUEUE_SHEET
+  );
+  if (exists) return;
+  await sheets.spreadsheets.batchUpdate({
+    spreadsheetId: SPREADSHEET_ID,
+    requestBody: {
+      requests: [{ addSheet: { properties: { title: OBSIDIAN_QUEUE_SHEET } } }],
+    },
+  });
+  await sheets.spreadsheets.values.update({
+    spreadsheetId: SPREADSHEET_ID,
+    range: `${OBSIDIAN_QUEUE_SHEET}!A1:I1`,
+    valueInputOption: "RAW",
+    requestBody: {
+      values: [[
+        "queued_at", "source", "item_id", "title", "url", "memo",
+        "status", "synced_at", "obsidian_filename",
+      ]],
+    },
+  });
+}
+
+export async function appendToObsidianQueue(args: {
+  source: "telegram" | "web";
+  itemId: string;
+  title: string;
+  url: string;
+  memo: string;
+}) {
+  await ensureObsidianQueue();
+  const auth = getAuth();
+  const sheets = google.sheets({ version: "v4", auth });
+  const queuedAt = new Date()
+    .toLocaleString("sv-SE", { timeZone: "Asia/Seoul" })
+    .replace("T", " ");
+  await sheets.spreadsheets.values.append({
+    spreadsheetId: SPREADSHEET_ID,
+    range: `${OBSIDIAN_QUEUE_SHEET}!A:I`,
+    valueInputOption: "RAW",
+    insertDataOption: "INSERT_ROWS",
+    requestBody: {
+      values: [[
+        queuedAt, args.source, args.itemId, args.title, args.url, args.memo,
+        "pending", "", "",
+      ]],
+    },
+  });
 }

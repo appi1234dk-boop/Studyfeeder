@@ -198,6 +198,9 @@ export default function DetailSidebar({ item, threads, onClose, onUpdate, onDele
   const [showTagInput, setShowTagInput] = useState(false);
   const [ratingSuggestion, setRatingSuggestion] = useState<{ rating: number; reason: string } | null>(null);
   const [showOriginal, setShowOriginal] = useState(true);
+  const [sessionInitialIdeas, setSessionInitialIdeas] = useState("");
+  const [lastSentMemo, setLastSentMemo] = useState<string | null>(null);
+  const [obsidianStatus, setObsidianStatus] = useState<"idle" | "sending" | "sent" | "error">("idle");
 
   useEffect(() => {
     if (item) {
@@ -211,6 +214,15 @@ export default function DetailSidebar({ item, threads, onClose, onUpdate, onDele
       setShowOriginal(true);
     }
   }, [item]);
+
+  // 자료가 바뀔 때만(같은 자료의 다른 필드 변경에는 영향 X) 옵시디언 세션 상태 초기화
+  useEffect(() => {
+    if (item) {
+      setSessionInitialIdeas(item.ideas);
+      setLastSentMemo(null);
+      setObsidianStatus("idle");
+    }
+  }, [item?.id]);
 
   const saveField = useCallback(
     (field: string, value: string | boolean | number) => {
@@ -245,9 +257,52 @@ export default function DetailSidebar({ item, threads, onClose, onUpdate, onDele
     }
   }, [item, ideas]);
 
+  const pushToObsidian = useCallback(async () => {
+    if (!item) return;
+    const memo = ideas.trim();
+    if (!memo) return;
+    setObsidianStatus("sending");
+    try {
+      const res = await fetch(`/api/items/${item.id}/obsidian`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ memo }),
+      });
+      if (!res.ok) throw new Error(`status ${res.status}`);
+      setLastSentMemo(ideas);
+      setObsidianStatus("sent");
+    } catch {
+      setObsidianStatus("error");
+    }
+  }, [item, ideas]);
+
   if (!item) return null;
 
   const hasMemo = Boolean((item.ideas || "").trim());
+  const trimmedIdeas = ideas.trim();
+  const obsidianEnabled =
+    !!trimmedIdeas &&
+    ideas !== sessionInitialIdeas &&
+    ideas !== lastSentMemo &&
+    obsidianStatus !== "sending";
+
+  const renderObsidianButton = () => (
+    <div className="flex items-center gap-2">
+      <button
+        className="px-3 py-1.5 text-[13px] rounded-md border border-[var(--border)] bg-white hover:border-[var(--primary)] hover:text-[var(--primary)] transition-colors disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:border-[var(--border)] disabled:hover:text-inherit"
+        disabled={!obsidianEnabled}
+        onClick={pushToObsidian}
+      >
+        {obsidianStatus === "sending" ? "보내는 중..." : "옵시디언 Inbox에 추가"}
+      </button>
+      {obsidianStatus === "sent" && (
+        <span className="text-[12px] text-green-600">옵시디언에 보냈습니다</span>
+      )}
+      {obsidianStatus === "error" && (
+        <span className="text-[12px] text-red-600">전송 실패</span>
+      )}
+    </div>
+  );
   const tags = item.tags ? item.tags.split(",").map((t) => t.trim()).filter(Boolean) : [];
   const imageUrls = item.images ? item.images.split(",").map((u) => driveUrlToThumbnail(u.trim())).filter(Boolean) : [];
   const youtubeId = item.type === "youtube" ? getYouTubeId(item.url) : null;
@@ -375,7 +430,10 @@ export default function DetailSidebar({ item, threads, onClose, onUpdate, onDele
               className="w-full min-h-[200px] border border-[var(--border)] rounded-lg p-3 text-sm leading-relaxed outline-none resize-y focus:border-[var(--primary)] transition-colors"
               placeholder="이 자료를 보고 느낀 점, 떠오른 아이디어, 적용할 곳을 적어보세요..."
               value={ideas}
-              onChange={(e) => setIdeas(e.target.value)}
+              onChange={(e) => {
+                setIdeas(e.target.value);
+                if (obsidianStatus !== "idle") setObsidianStatus("idle");
+              }}
               onBlur={() => {
                 if (ideas !== item.ideas) {
                   saveField("ideas", ideas);
@@ -383,6 +441,7 @@ export default function DetailSidebar({ item, threads, onClose, onUpdate, onDele
                 }
               }}
             />
+            {renderObsidianButton()}
           </div>
         )}
 
@@ -592,7 +651,10 @@ export default function DetailSidebar({ item, threads, onClose, onUpdate, onDele
               className="w-full min-h-[160px] border border-[var(--border)] rounded-lg p-3 text-sm leading-relaxed outline-none resize-y focus:border-[var(--primary)] transition-colors"
               placeholder="이 자료를 보고 느낀 점, 떠오른 아이디어, 적용할 곳을 적어보세요..."
               value={ideas}
-              onChange={(e) => setIdeas(e.target.value)}
+              onChange={(e) => {
+                setIdeas(e.target.value);
+                if (obsidianStatus !== "idle") setObsidianStatus("idle");
+              }}
               onBlur={() => {
                 if (ideas !== item.ideas) {
                   saveField("ideas", ideas);
@@ -600,6 +662,7 @@ export default function DetailSidebar({ item, threads, onClose, onUpdate, onDele
                 }
               }}
             />
+            {renderObsidianButton()}
           </div>
         )}
 
