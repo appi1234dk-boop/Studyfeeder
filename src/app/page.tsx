@@ -6,6 +6,7 @@ import TopBar from "@/components/TopBar";
 import Sidebar from "@/components/Sidebar";
 import ItemCard from "@/components/ItemCard";
 import DetailSidebar from "@/components/DetailSidebar";
+import NoteTakingMode from "@/components/NoteTakingMode";
 import StatsView from "@/components/StatsView";
 
 export default function Home() {
@@ -21,6 +22,7 @@ export default function Home() {
   const [dateRange, setDateRange] = useState<{ from: string; to: string } | null>(null);
   const [sortOrder, setSortOrder] = useState<"newest" | "oldest" | "rating">("newest");
   const [ratingFilter, setRatingFilter] = useState<null | "unrated" | 1 | 2 | 3>(null);
+  const [noteMode, setNoteMode] = useState(false);
 
   useEffect(() => {
     fetch("/api/items")
@@ -356,9 +358,17 @@ export default function Home() {
             onClose={() => setSelectedItemId(null)}
             onUpdate={handleUpdate}
             onDelete={handleDelete}
+            onEnterNoteMode={() => setNoteMode(true)}
           />
         )}
       </div>
+      {noteMode && selectedItem && (
+        <NoteTakingMode
+          item={selectedItem}
+          onClose={() => setNoteMode(false)}
+          onUpdate={handleUpdate}
+        />
+      )}
     </div>
   );
 }

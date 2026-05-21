@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import type { Item } from "@/lib/types";
+import { getYouTubeId, getInstagramEmbedUrl, getLinkedInEmbedUrl } from "@/lib/embeds";
 
 function driveUrlToThumbnail(url: string): string {
   const m = url.match(/\/d\/([^/]+)/);
@@ -15,26 +16,7 @@ interface DetailSidebarProps {
   onClose: () => void;
   onUpdate: (id: string, updates: Partial<Item>) => void;
   onDelete: (id: string) => void;
-}
-
-function getYouTubeId(url: string): string | null {
-  const m = url.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/)([\w-]+)/);
-  return m ? m[1] : null;
-}
-
-function getInstagramEmbedUrl(url: string): string | null {
-  const m = url.match(/instagram\.com\/(?:p|reel)\/([A-Za-z0-9_-]+)/);
-  return m ? `https://www.instagram.com/p/${m[1]}/embed/` : null;
-}
-
-function getLinkedInEmbedUrl(url: string): string | null {
-  // Pattern: linkedin.com/feed/update/urn:li:activity:123456
-  const activityMatch = url.match(/linkedin\.com\/feed\/update\/(urn:li:(?:activity|share):\d+)/);
-  if (activityMatch) return `https://www.linkedin.com/embed/feed/update/${activityMatch[1]}`;
-  // Pattern: linkedin.com/posts/username_...-activity-123...- or -share-123...- or -ugcPost-123...-
-  const postMatch = url.match(/linkedin\.com\/posts\/[^/]+-(activity|share|ugcPost)-(\d+)-/);
-  if (postMatch) return `https://www.linkedin.com/embed/feed/update/urn:li:${postMatch[1]}:${postMatch[2]}`;
-  return null;
+  onEnterNoteMode?: () => void;
 }
 
 function isLongBlackUrl(url: string): boolean {
@@ -189,7 +171,7 @@ function ImageGallery({ urls }: { urls: string[] }) {
   );
 }
 
-export default function DetailSidebar({ item, threads, onClose, onUpdate, onDelete }: DetailSidebarProps) {
+export default function DetailSidebar({ item, threads, onClose, onUpdate, onDelete, onEnterNoteMode }: DetailSidebarProps) {
   const [title, setTitle] = useState("");
   const [ideas, setIdeas] = useState("");
   const [threadOpen, setThreadOpen] = useState(false);
@@ -544,9 +526,19 @@ export default function DetailSidebar({ item, threads, onClose, onUpdate, onDele
             {/* YouTube embed */}
             {youtubeId && (
               <div className="flex flex-col gap-1.5">
-                <label className="text-xs font-semibold uppercase tracking-wide text-[var(--secondary)]">
-                  영상
-                </label>
+                <div className="flex items-center justify-between gap-2">
+                  <label className="text-xs font-semibold uppercase tracking-wide text-[var(--secondary)]">
+                    영상
+                  </label>
+                  {onEnterNoteMode && (
+                    <button
+                      className="text-[11px] px-2 py-0.5 rounded-md border border-[var(--border)] text-[var(--secondary)] hover:bg-gray-50 hover:text-[var(--primary)] hover:border-[var(--primary)] transition-colors"
+                      onClick={onEnterNoteMode}
+                    >
+                      노트 모드
+                    </button>
+                  )}
+                </div>
                 <div className="w-full aspect-video rounded-lg overflow-hidden bg-black">
                   <iframe
                     src={`https://www.youtube.com/embed/${youtubeId}`}
@@ -560,9 +552,19 @@ export default function DetailSidebar({ item, threads, onClose, onUpdate, onDele
             {/* Instagram embed */}
             {instagramEmbedUrl && (
               <div className="flex flex-col gap-1.5">
-                <label className="text-xs font-semibold uppercase tracking-wide text-[var(--secondary)]">
-                  인스타그램
-                </label>
+                <div className="flex items-center justify-between gap-2">
+                  <label className="text-xs font-semibold uppercase tracking-wide text-[var(--secondary)]">
+                    인스타그램
+                  </label>
+                  {onEnterNoteMode && (
+                    <button
+                      className="text-[11px] px-2 py-0.5 rounded-md border border-[var(--border)] text-[var(--secondary)] hover:bg-gray-50 hover:text-[var(--primary)] hover:border-[var(--primary)] transition-colors"
+                      onClick={onEnterNoteMode}
+                    >
+                      노트 모드
+                    </button>
+                  )}
+                </div>
                 <div className="w-full rounded-lg overflow-hidden border border-[var(--border)]">
                   <iframe
                     src={instagramEmbedUrl}
@@ -577,9 +579,19 @@ export default function DetailSidebar({ item, threads, onClose, onUpdate, onDele
             {/* LinkedIn embed */}
             {linkedInUrl && (
               <div className="flex flex-col gap-1.5">
-                <label className="text-xs font-semibold uppercase tracking-wide text-[var(--secondary)]">
-                  링크드인
-                </label>
+                <div className="flex items-center justify-between gap-2">
+                  <label className="text-xs font-semibold uppercase tracking-wide text-[var(--secondary)]">
+                    링크드인
+                  </label>
+                  {onEnterNoteMode && (
+                    <button
+                      className="text-[11px] px-2 py-0.5 rounded-md border border-[var(--border)] text-[var(--secondary)] hover:bg-gray-50 hover:text-[var(--primary)] hover:border-[var(--primary)] transition-colors"
+                      onClick={onEnterNoteMode}
+                    >
+                      노트 모드
+                    </button>
+                  )}
+                </div>
                 <div className="w-full rounded-lg overflow-hidden border border-[var(--border)]">
                   <iframe
                     src={linkedInUrl}
