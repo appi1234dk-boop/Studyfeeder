@@ -2,8 +2,6 @@
 
 import type { Item } from "@/lib/types";
 
-type RatingFilter = null | "unrated" | 1 | 2 | 3;
-
 interface SidebarProps {
   items: Item[];
   activeTab: "items" | "stats";
@@ -12,11 +10,9 @@ interface SidebarProps {
   onThreadSelect: (thread: string | null) => void;
   showUnreadOnly: boolean;
   onToggleUnread: (v: boolean) => void;
-  bookOnly: boolean;
-  onBookOnlyChange: (v: boolean) => void;
-  ratingFilter: RatingFilter;
-  onRatingFilterChange: (r: RatingFilter) => void;
-  ratingCounts: { unrated: number; one: number; two: number; three: number };
+  selectedTypes: string[];
+  onTypesChange: (types: string[]) => void;
+  allTypes: { name: string; count: number }[];
 }
 
 export default function Sidebar({
@@ -27,15 +23,12 @@ export default function Sidebar({
   onThreadSelect,
   showUnreadOnly,
   onToggleUnread,
-  bookOnly,
-  onBookOnlyChange,
-  ratingFilter,
-  onRatingFilterChange,
-  ratingCounts,
+  selectedTypes,
+  onTypesChange,
+  allTypes,
 }: SidebarProps) {
   const totalCount = items.length;
   const unreadCount = items.filter((i) => !i.is_read).length;
-  const bookCount = items.filter((i) => i.type === "book").length;
 
   const threadCounts: Record<string, number> = {};
   let unclassifiedCount = 0;
@@ -47,6 +40,14 @@ export default function Sidebar({
     }
   }
   const threads = Object.entries(threadCounts).sort((a, b) => b[1] - a[1]);
+
+  function toggleType(type: string) {
+    onTypesChange(
+      selectedTypes.includes(type)
+        ? selectedTypes.filter((t) => t !== type)
+        : [...selectedTypes, type]
+    );
+  }
 
   return (
     <aside className="w-[240px] bg-white border-r border-[var(--border)] flex flex-col shrink-0 overflow-y-auto">
@@ -81,15 +82,15 @@ export default function Sidebar({
         </div>
         <button
           className={`w-full flex items-center justify-between px-3 py-2 rounded-lg text-sm transition-colors ${
-            selectedThread === null && !showUnreadOnly && !bookOnly
+            selectedThread === null && !showUnreadOnly
               ? "bg-[var(--primary-light)] text-[var(--primary)] font-medium"
               : "hover:bg-[var(--background)]"
           }`}
-          onClick={() => { onThreadSelect(null); onToggleUnread(false); onBookOnlyChange(false); }}
+          onClick={() => { onThreadSelect(null); onToggleUnread(false); }}
         >
           <span>전체 자료</span>
           <span className={`text-xs px-2 py-0.5 rounded-full ${
-            selectedThread === null && !showUnreadOnly && !bookOnly
+            selectedThread === null && !showUnreadOnly
               ? "bg-[var(--primary)]/15 text-[var(--primary)]"
               : "bg-gray-100 text-[var(--secondary)]"
           }`}>
@@ -102,7 +103,7 @@ export default function Sidebar({
               ? "bg-[var(--primary-light)] text-[var(--primary)] font-medium"
               : "hover:bg-[var(--background)]"
           }`}
-          onClick={() => { onThreadSelect(null); onToggleUnread(true); onBookOnlyChange(false); }}
+          onClick={() => { onThreadSelect(null); onToggleUnread(true); }}
         >
           <span>안 읽은 자료</span>
           <span className={`text-xs px-2 py-0.5 rounded-full ${
@@ -113,63 +114,39 @@ export default function Sidebar({
             {unreadCount}
           </span>
         </button>
-        <button
-          className={`w-full flex items-center justify-between px-3 py-2 rounded-lg text-sm transition-colors ${
-            bookOnly
-              ? "bg-[var(--primary-light)] text-[var(--primary)] font-medium"
-              : "hover:bg-[var(--background)]"
-          }`}
-          onClick={() => { onThreadSelect(null); onToggleUnread(false); onBookOnlyChange(true); }}
-        >
-          <span>📖 서재</span>
-          <span className={`text-xs px-2 py-0.5 rounded-full ${
-            bookOnly
-              ? "bg-[var(--primary)]/15 text-[var(--primary)]"
-              : "bg-gray-100 text-[var(--secondary)]"
-          }`}>
-            {bookCount}
-          </span>
-        </button>
       </div>
 
-      {/* Rating */}
-      <div className="p-4 pt-0">
-        <div className="text-[11px] font-semibold uppercase tracking-wide text-[var(--secondary)] mb-2">
-          콘텐츠 가치
-        </div>
-        {([
-          { key: 3 as const, label: "★★★ 자주 보기", count: ratingCounts.three },
-          { key: 2 as const, label: "★★ 다시 보고 싶음", count: ratingCounts.two },
-          { key: 1 as const, label: "★ 1회독", count: ratingCounts.one },
-          { key: "unrated" as const, label: "미평가", count: ratingCounts.unrated },
-        ]).map((opt) => {
-          const active = ratingFilter === opt.key;
-          return (
-            <button
-              key={String(opt.key)}
-              className={`w-full flex items-center justify-between px-3 py-2 rounded-lg text-sm transition-colors ${
-                active
-                  ? "bg-[var(--primary-light)] text-[var(--primary)] font-medium"
-                  : "hover:bg-[var(--background)]"
-              }`}
-              onClick={() => onRatingFilterChange(active ? null : opt.key)}
-            >
-              <span className={opt.key === "unrated" ? "text-[var(--secondary)]" : "text-amber-600"}>
-                {opt.label}
-              </span>
-              <span
-                className={`text-xs px-2 py-0.5 rounded-full ${
+      {/* Types */}
+      {allTypes.length > 0 && (
+        <div className="p-4 pt-0">
+          <div className="text-[11px] font-semibold uppercase tracking-wide text-[var(--secondary)] mb-2">
+            유형
+          </div>
+          {allTypes.map((t) => {
+            const active = selectedTypes.includes(t.name);
+            return (
+              <button
+                key={t.name}
+                className={`w-full flex items-center justify-between px-3 py-2 rounded-lg text-sm transition-colors ${
+                  active
+                    ? "bg-[var(--primary-light)] text-[var(--primary)] font-medium"
+                    : "hover:bg-[var(--background)]"
+                }`}
+                onClick={() => toggleType(t.name)}
+              >
+                <span className="uppercase text-[13px]">{t.name}</span>
+                <span className={`text-xs px-2 py-0.5 rounded-full ${
                   active
                     ? "bg-[var(--primary)]/15 text-[var(--primary)]"
                     : "bg-gray-100 text-[var(--secondary)]"
-                }`}
-              >
-                {opt.count}
-              </span>
-            </button>
-          );
-        })}
-      </div>
+                }`}>
+                  {t.count}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+      )}
 
       {/* Threads */}
       <div className="p-4 pt-0">
@@ -184,7 +161,7 @@ export default function Sidebar({
                 ? "bg-[var(--primary-light)] text-[var(--primary)] font-medium"
                 : "hover:bg-[var(--background)]"
             }`}
-            onClick={() => { onThreadSelect(name); onToggleUnread(false); onBookOnlyChange(false); }}
+            onClick={() => { onThreadSelect(name); onToggleUnread(false); }}
           >
             <span>{name}</span>
             <span className={`text-xs px-2 py-0.5 rounded-full ${
@@ -203,7 +180,7 @@ export default function Sidebar({
                 ? "bg-[var(--primary-light)] text-[var(--primary)] font-medium"
                 : "hover:bg-[var(--background)]"
             }`}
-            onClick={() => { onThreadSelect("__none__"); onToggleUnread(false); onBookOnlyChange(false); }}
+            onClick={() => { onThreadSelect("__none__"); onToggleUnread(false); }}
           >
             <span>미분류</span>
             <span className={`text-xs px-2 py-0.5 rounded-full ${

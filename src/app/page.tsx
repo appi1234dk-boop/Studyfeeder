@@ -16,7 +16,6 @@ export default function Home() {
   const [selectedItemId, setSelectedItemId] = useState<string | null>(null);
   const [selectedThread, setSelectedThread] = useState<string | null>(null);
   const [showUnreadOnly, setShowUnreadOnly] = useState(false);
-  const [bookOnly, setBookOnly] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const [selectedTypes, setSelectedTypes] = useState<string[]>([]);
@@ -70,10 +69,6 @@ export default function Home() {
 
     if (showUnreadOnly) {
       result = result.filter((i) => !i.is_read);
-    }
-
-    if (bookOnly) {
-      result = result.filter((i) => i.type === "book");
     }
 
     if (selectedThread === "__none__") {
@@ -130,19 +125,7 @@ export default function Home() {
     });
 
     return result;
-  }, [activeItems, showUnreadOnly, bookOnly, selectedThread, searchQuery, selectedTags, selectedTypes, dateRange, sortOrder, ratingFilter]);
-
-  const ratingCounts = useMemo(() => {
-    const c = { unrated: 0, one: 0, two: 0, three: 0 };
-    for (const i of activeItems) {
-      const r = i.value_rating || 0;
-      if (r === 0) c.unrated++;
-      else if (r === 1) c.one++;
-      else if (r === 2) c.two++;
-      else if (r === 3) c.three++;
-    }
-    return c;
-  }, [activeItems]);
+  }, [activeItems, showUnreadOnly, selectedThread, searchQuery, selectedTags, selectedTypes, dateRange, sortOrder, ratingFilter]);
 
   const selectedItem = items.find((i) => i.id === selectedItemId) || null;
 
@@ -185,8 +168,6 @@ export default function Home() {
 
   const listTitle = showUnreadOnly
     ? "안 읽은 자료"
-    : bookOnly
-    ? "📖 서재"
     : selectedThread === "__none__"
     ? "미분류"
     : selectedThread
@@ -210,12 +191,11 @@ export default function Home() {
         onSearchChange={setSearchQuery}
         selectedTags={selectedTags}
         onTagsChange={setSelectedTags}
-        selectedTypes={selectedTypes}
-        onTypesChange={setSelectedTypes}
         dateRange={dateRange}
         onDateRangeChange={setDateRange}
         allTags={allTags}
-        allTypes={allTypes}
+        ratingFilter={ratingFilter}
+        onRatingFilterChange={setRatingFilter}
       />
       <div className="flex flex-1 overflow-hidden">
         <Sidebar
@@ -226,11 +206,9 @@ export default function Home() {
           onThreadSelect={setSelectedThread}
           showUnreadOnly={showUnreadOnly}
           onToggleUnread={setShowUnreadOnly}
-          bookOnly={bookOnly}
-          onBookOnlyChange={setBookOnly}
-          ratingFilter={ratingFilter}
-          onRatingFilterChange={setRatingFilter}
-          ratingCounts={ratingCounts}
+          selectedTypes={selectedTypes}
+          onTypesChange={setSelectedTypes}
+          allTypes={allTypes}
         />
         <main className="flex-1 overflow-y-auto p-6">
           {activeTab === "items" ? (
@@ -353,7 +331,6 @@ export default function Home() {
                 setSelectedTags([tag]);
                 setSelectedThread(null);
                 setShowUnreadOnly(false);
-                setBookOnly(false);
                 setActiveTab("items");
               }}
             />

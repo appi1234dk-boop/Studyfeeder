@@ -13,10 +13,6 @@ const TYPE_STYLES: Record<string, string> = {
   book: "bg-amber-50 text-amber-700",
 };
 
-const TYPE_LABELS: Record<string, string> = {
-  book: "📖 책",
-};
-
 // 책 요약(구조화 마크다운)에서 카드용 평문 스니펫 추출
 function plainSnippet(md: string): string {
   return (md || "")
@@ -112,7 +108,7 @@ export default function ItemCard({ item, isSelected, onClick }: ItemCardProps) {
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2 mb-1">
           <span className={`text-[11px] font-semibold uppercase px-1.5 py-0.5 rounded ${TYPE_STYLES[displayType] || "bg-gray-100 text-gray-500"}`}>
-            {TYPE_LABELS[displayType] || displayType}
+            {displayType}
           </span>
           <RatingStars rating={item.value_rating} />
           {!hasMemo && !isBook && (
