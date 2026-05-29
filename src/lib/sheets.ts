@@ -12,6 +12,40 @@ function getAuth() {
 const SPREADSHEET_ID = process.env.GOOGLE_SHEETS_ID!;
 const SHEET_NAME = "자료";
 const OBSIDIAN_QUEUE_SHEET = "obsidian_queue";
+const LINKS_SHEET = "links";
+
+export type RelatedLink = { related_id: string; score: number; reason: string };
+export type LinksMap = Record<string, RelatedLink[]>;
+
+export async function getLinks(): Promise<LinksMap> {
+  const auth = getAuth();
+  const sheets = google.sheets({ version: "v4", auth });
+  let rows: string[][] = [];
+  try {
+    const res = await sheets.spreadsheets.values.get({
+      spreadsheetId: SPREADSHEET_ID,
+      range: `${LINKS_SHEET}!A2:E`,
+    });
+    rows = (res.data.values as string[][]) || [];
+  } catch {
+    return {}; // links 탭이 아직 없으면 빈 맵
+  }
+  const map: LinksMap = {};
+  for (const row of rows) {
+    const itemId = row[0];
+    const relatedId = row[1];
+    if (!itemId || !relatedId) continue;
+    (map[itemId] ||= []).push({
+      related_id: relatedId,
+      score: parseFloat(row[2] || "0") || 0,
+      reason: row[3] || "",
+    });
+  }
+  for (const id of Object.keys(map)) {
+    map[id].sort((a, b) => b.score - a.score);
+  }
+  return map;
+}
 
 export async function getAllItems(): Promise<Item[]> {
   const auth = getAuth();

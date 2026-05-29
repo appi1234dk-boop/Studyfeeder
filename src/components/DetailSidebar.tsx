@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import type { Item } from "@/lib/types";
+import type { RelatedLink } from "@/lib/sheets";
 import { getYouTubeId, getInstagramEmbedUrl, getLinkedInEmbedUrl } from "@/lib/embeds";
 
 function driveUrlToThumbnail(url: string): string {
@@ -71,8 +72,25 @@ function BookSummary({ markdown }: { markdown: string }) {
   return <div className="text-sm flex flex-col gap-1.5">{blocks}</div>;
 }
 
+// 관련 자료 썸네일 (ItemCard 로직 간소화 버전)
+function relatedThumbnail(item: Item): string | null {
+  if (item.images) {
+    const first = item.images.split(",")[0].trim();
+    if (first) {
+      const m = first.match(/\/d\/([^/]+)/);
+      return m ? `https://drive.google.com/thumbnail?id=${m[1]}&sz=w120` : first;
+    }
+  }
+  const yt = item.url?.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/)([\w-]+)/);
+  if (yt) return `https://img.youtube.com/vi/${yt[1]}/mqdefault.jpg`;
+  return null;
+}
+
 interface DetailSidebarProps {
   item: Item | null;
+  items?: Item[];
+  relatedLinks?: RelatedLink[];
+  onSelectItem?: (id: string) => void;
   threads: string[];
   onClose: () => void;
   onUpdate: (id: string, updates: Partial<Item>) => void;
@@ -232,7 +250,7 @@ function ImageGallery({ urls }: { urls: string[] }) {
   );
 }
 
-export default function DetailSidebar({ item, threads, onClose, onUpdate, onDelete, onEnterNoteMode }: DetailSidebarProps) {
+export default function DetailSidebar({ item, items = [], relatedLinks = [], onSelectItem, threads, onClose, onUpdate, onDelete, onEnterNoteMode }: DetailSidebarProps) {
   const [title, setTitle] = useState("");
   const [ideas, setIdeas] = useState("");
   const [threadOpen, setThreadOpen] = useState(false);
@@ -369,6 +387,12 @@ export default function DetailSidebar({ item, threads, onClose, onUpdate, onDele
   const longBlack = item.url ? isLongBlackUrl(item.url) : false;
   const youtubePost = item.url ? isYouTubePostUrl(item.url) : false;
   const isBook = item.type === "book";
+  const relatedResolved = relatedLinks
+    .map((l) => {
+      const it = items.find((i) => i.id === l.related_id);
+      return it && !it.is_archived ? { item: it, reason: l.reason } : null;
+    })
+    .filter((x): x is { item: Item; reason: string } => x !== null);
 
   const addTag = (tag: string) => {
     const trimmed = tag.trim();
@@ -587,6 +611,49 @@ export default function DetailSidebar({ item, threads, onClose, onUpdate, onDele
             )}
           </div>
         </div>
+
+        {/* 관련 자료 */}
+        {relatedResolved.length > 0 && (
+          <div className="flex flex-col gap-1.5">
+            <label className="text-xs font-semibold uppercase tracking-wide text-[var(--secondary)]">
+              🔗 관련 자료
+            </label>
+            <div className="flex flex-col gap-1.5">
+              {relatedResolved.map(({ item: rel, reason }) => {
+                const thumb = relatedThumbnail(rel);
+                return (
+                  <button
+                    key={rel.id}
+                    className="w-full text-left flex items-start gap-2.5 p-2 rounded-lg border border-[var(--border)] hover:border-[var(--primary)] hover:bg-[var(--primary-light)] transition-colors"
+                    onClick={() => onSelectItem?.(rel.id)}
+                  >
+                    {thumb ? (
+                      <img
+                        src={thumb}
+                        alt=""
+                        className="w-12 h-12 object-cover rounded shrink-0 border border-[var(--border)] bg-gray-50"
+                        loading="lazy"
+                        onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }}
+                      />
+                    ) : (
+                      <span className="w-12 h-12 rounded shrink-0 bg-gray-100 flex items-center justify-center text-[10px] uppercase text-[var(--secondary)]">
+                        {rel.type}
+                      </span>
+                    )}
+                    <div className="flex-1 min-w-0">
+                      <div className="text-[13px] font-medium leading-snug line-clamp-2">{rel.title || "(제목 없음)"}</div>
+                      {reason && (
+                        <div className="text-[11px] text-[var(--secondary)] leading-relaxed mt-0.5 line-clamp-2">
+                          {reason}
+                        </div>
+                      )}
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        )}
 
         {/* Original content — collapsible only when memo exists */}
         {hasMemo && (

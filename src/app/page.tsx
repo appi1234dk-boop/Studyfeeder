@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useMemo, useCallback } from "react";
 import type { Item } from "@/lib/types";
+import type { LinksMap } from "@/lib/sheets";
 import TopBar from "@/components/TopBar";
 import Sidebar from "@/components/Sidebar";
 import ItemCard from "@/components/ItemCard";
@@ -11,6 +12,7 @@ import StatsView from "@/components/StatsView";
 
 export default function Home() {
   const [items, setItems] = useState<Item[]>([]);
+  const [links, setLinks] = useState<LinksMap>({});
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<"items" | "stats">("items");
   const [selectedItemId, setSelectedItemId] = useState<string | null>(null);
@@ -29,6 +31,10 @@ export default function Home() {
       .then((r) => r.json())
       .then((data) => { setItems(data); setLoading(false); })
       .catch(() => setLoading(false));
+    fetch("/api/links")
+      .then((r) => r.json())
+      .then((data) => setLinks(data || {}))
+      .catch(() => {});
   }, []);
 
   const activeItems = useMemo(() => items.filter((i) => !i.is_archived), [items]);
@@ -339,6 +345,9 @@ export default function Home() {
         {activeTab === "items" && selectedItem && (
           <DetailSidebar
             item={selectedItem}
+            items={items}
+            relatedLinks={links[selectedItem.id] ?? []}
+            onSelectItem={setSelectedItemId}
             threads={threads}
             onClose={() => setSelectedItemId(null)}
             onUpdate={handleUpdate}
