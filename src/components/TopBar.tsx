@@ -2,8 +2,6 @@
 
 import { useState, useRef, useEffect } from "react";
 
-type RatingFilter = null | "unrated" | 1 | 2 | 3;
-
 interface TopBarProps {
   searchQuery: string;
   onSearchChange: (q: string) => void;
@@ -15,8 +13,6 @@ interface TopBarProps {
   onDateRangeChange: (range: { from: string; to: string } | null) => void;
   allTags: { name: string; count: number }[];
   allTypes: { name: string; count: number }[];
-  ratingFilter: RatingFilter;
-  onRatingFilterChange: (r: RatingFilter) => void;
 }
 
 function FilterDropdown({
@@ -107,8 +103,6 @@ export default function TopBar({
   onDateRangeChange,
   allTags,
   allTypes,
-  ratingFilter,
-  onRatingFilterChange,
 }: TopBarProps) {
   const [openFilter, setOpenFilter] = useState<string | null>(null);
   const [dateFrom, setDateFrom] = useState(dateRange?.from || "");
@@ -239,31 +233,6 @@ export default function TopBar({
             />
           </div>
         </FilterDropdown>
-
-        <div className="flex items-center gap-1 border border-[var(--border)] rounded-lg h-9 px-1">
-          {([
-            { key: null, label: "전체" },
-            { key: 1 as const, label: "★" },
-            { key: 2 as const, label: "★★" },
-            { key: 3 as const, label: "★★★" },
-          ]).map((opt) => {
-            const active = ratingFilter === opt.key;
-            return (
-              <button
-                key={String(opt.key)}
-                className={`px-2 h-7 rounded-md text-[12px] transition-colors ${
-                  active
-                    ? "bg-amber-100 text-amber-700 font-medium"
-                    : "text-[var(--secondary)] hover:text-[var(--foreground)]"
-                }`}
-                onClick={() => onRatingFilterChange(opt.key)}
-                title={opt.key === null ? "별점 필터 해제" : `${opt.label}`}
-              >
-                {opt.label}
-              </button>
-            );
-          })}
-        </div>
 
         <FilterDropdown
           label="유형"

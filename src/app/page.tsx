@@ -16,6 +16,7 @@ export default function Home() {
   const [selectedItemId, setSelectedItemId] = useState<string | null>(null);
   const [selectedThread, setSelectedThread] = useState<string | null>(null);
   const [showUnreadOnly, setShowUnreadOnly] = useState(false);
+  const [bookOnly, setBookOnly] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const [selectedTypes, setSelectedTypes] = useState<string[]>([]);
@@ -69,6 +70,10 @@ export default function Home() {
 
     if (showUnreadOnly) {
       result = result.filter((i) => !i.is_read);
+    }
+
+    if (bookOnly) {
+      result = result.filter((i) => i.type === "book");
     }
 
     if (selectedThread === "__none__") {
@@ -125,7 +130,7 @@ export default function Home() {
     });
 
     return result;
-  }, [activeItems, showUnreadOnly, selectedThread, searchQuery, selectedTags, selectedTypes, dateRange, sortOrder, ratingFilter]);
+  }, [activeItems, showUnreadOnly, bookOnly, selectedThread, searchQuery, selectedTags, selectedTypes, dateRange, sortOrder, ratingFilter]);
 
   const ratingCounts = useMemo(() => {
     const c = { unrated: 0, one: 0, two: 0, three: 0 };
@@ -180,6 +185,8 @@ export default function Home() {
 
   const listTitle = showUnreadOnly
     ? "안 읽은 자료"
+    : bookOnly
+    ? "📖 서재"
     : selectedThread === "__none__"
     ? "미분류"
     : selectedThread
@@ -209,8 +216,6 @@ export default function Home() {
         onDateRangeChange={setDateRange}
         allTags={allTags}
         allTypes={allTypes}
-        ratingFilter={ratingFilter}
-        onRatingFilterChange={setRatingFilter}
       />
       <div className="flex flex-1 overflow-hidden">
         <Sidebar
@@ -221,6 +226,8 @@ export default function Home() {
           onThreadSelect={setSelectedThread}
           showUnreadOnly={showUnreadOnly}
           onToggleUnread={setShowUnreadOnly}
+          bookOnly={bookOnly}
+          onBookOnlyChange={setBookOnly}
           ratingFilter={ratingFilter}
           onRatingFilterChange={setRatingFilter}
           ratingCounts={ratingCounts}
@@ -346,6 +353,7 @@ export default function Home() {
                 setSelectedTags([tag]);
                 setSelectedThread(null);
                 setShowUnreadOnly(false);
+                setBookOnly(false);
                 setActiveTab("items");
               }}
             />

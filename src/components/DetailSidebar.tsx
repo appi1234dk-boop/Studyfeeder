@@ -10,6 +10,67 @@ function driveUrlToThumbnail(url: string): string {
   return url;
 }
 
+// **bold** 인라인 처리
+function renderInline(text: string, keyPrefix: string): React.ReactNode[] {
+  return text.split(/\*\*(.+?)\*\*/g).map((p, i) =>
+    i % 2 === 1
+      ? <strong key={`${keyPrefix}-${i}`}>{p}</strong>
+      : <span key={`${keyPrefix}-${i}`}>{p}</span>
+  );
+}
+
+// 책 요약(구조화 마크다운) 경량 렌더러 — ## 헤딩 / - 불릿 / > 인용 / **굵게**
+function BookSummary({ markdown }: { markdown: string }) {
+  const lines = markdown.split("\n");
+  const blocks: React.ReactNode[] = [];
+  let listItems: string[] = [];
+  let key = 0;
+
+  const flushList = () => {
+    if (listItems.length) {
+      const items = [...listItems];
+      const k = key++;
+      blocks.push(
+        <ul key={`ul-${k}`} className="list-disc pl-5 flex flex-col gap-1 my-0.5">
+          {items.map((it, i) => <li key={i}>{renderInline(it, `li-${k}-${i}`)}</li>)}
+        </ul>
+      );
+      listItems = [];
+    }
+  };
+
+  for (const raw of lines) {
+    const line = raw.trimEnd();
+    if (/^#{1,6}\s+/.test(line)) {
+      flushList();
+      blocks.push(
+        <h4 key={`h-${key++}`} className="text-[12px] font-bold uppercase tracking-wide text-[var(--primary)] mt-3 first:mt-0">
+          {line.replace(/^#{1,6}\s+/, "")}
+        </h4>
+      );
+    } else if (/^>\s?/.test(line)) {
+      flushList();
+      blocks.push(
+        <blockquote key={`q-${key}`} className="border-l-2 border-amber-300 pl-3 py-0.5 text-[var(--secondary)] italic">
+          {renderInline(line.replace(/^>\s?/, ""), `q-${key++}`)}
+        </blockquote>
+      );
+    } else if (/^[-*]\s+/.test(line)) {
+      listItems.push(line.replace(/^[-*]\s+/, ""));
+    } else if (line.trim() === "") {
+      flushList();
+    } else {
+      flushList();
+      blocks.push(
+        <p key={`p-${key}`} className="leading-relaxed">{renderInline(line, `p-${key++}`)}</p>
+      );
+    }
+  }
+  flushList();
+
+  return <div className="text-sm flex flex-col gap-1.5">{blocks}</div>;
+}
+
 interface DetailSidebarProps {
   item: Item | null;
   threads: string[];
@@ -307,6 +368,7 @@ export default function DetailSidebar({ item, threads, onClose, onUpdate, onDele
   ) : null;
   const longBlack = item.url ? isLongBlackUrl(item.url) : false;
   const youtubePost = item.url ? isYouTubePostUrl(item.url) : false;
+  const isBook = item.type === "book";
 
   const addTag = (tag: string) => {
     const trimmed = tag.trim();
@@ -541,6 +603,18 @@ export default function DetailSidebar({ item, threads, onClose, onUpdate, onDele
 
         {(!hasMemo || showOriginal) && (
           <>
+            {/* 책: Notion 전체 보기 CTA */}
+            {isBook && item.url && (
+              <a
+                href={item.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center justify-center gap-2 px-3 py-2.5 rounded-lg border border-amber-300 bg-amber-50 text-amber-800 text-[13px] font-medium hover:bg-amber-100 transition-colors"
+              >
+                📖 Notion에서 전체 보기 ↗
+              </a>
+            )}
+
             {/* YouTube embed */}
             {youtubeId && (
               <div className="flex flex-col gap-1.5">
@@ -615,14 +689,18 @@ export default function DetailSidebar({ item, threads, onClose, onUpdate, onDele
             {item.summary && (
               <div className="flex flex-col gap-1.5">
                 <label className="text-xs font-semibold uppercase tracking-wide text-[var(--secondary)]">
-                  요약
+                  {isBook ? "독서 노트" : "요약"}
                 </label>
-                <div className="text-sm leading-relaxed whitespace-pre-wrap">{item.summary}</div>
+                {isBook ? (
+                  <BookSummary markdown={item.summary} />
+                ) : (
+                  <div className="text-sm leading-relaxed whitespace-pre-wrap">{item.summary}</div>
+                )}
               </div>
             )}
 
-            {/* URL */}
-            {item.url && (
+            {/* URL — 책은 위의 Notion CTA로 대체 */}
+            {item.url && !isBook && (
               <div className="flex flex-col gap-1.5">
                 <label className="text-xs font-semibold uppercase tracking-wide text-[var(--secondary)]">
                   원본 링크

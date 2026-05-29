@@ -10,7 +10,23 @@ const TYPE_STYLES: Record<string, string> = {
   image: "bg-purple-50 text-purple-600",
   linkedin: "bg-sky-50 text-sky-700",
   instagram: "bg-pink-50 text-pink-600",
+  book: "bg-amber-50 text-amber-700",
 };
+
+const TYPE_LABELS: Record<string, string> = {
+  book: "📖 책",
+};
+
+// 책 요약(구조화 마크다운)에서 카드용 평문 스니펫 추출
+function plainSnippet(md: string): string {
+  return (md || "")
+    .replace(/^#+\s*/gm, "")
+    .replace(/^>\s?/gm, "")
+    .replace(/^[-*]\s+/gm, "")
+    .replace(/\*\*/g, "")
+    .replace(/\n+/g, " ")
+    .trim();
+}
 
 interface ItemCardProps {
   item: Item;
@@ -61,12 +77,15 @@ export default function ItemCard({ item, isSelected, onClick }: ItemCardProps) {
   const memoNeedsToggle = memoLines.length > 2 || memoText.length > 120;
   const imageCount = item.images ? item.images.split(",").filter(Boolean).length : 0;
   const thumbnail = getThumbnailUrl(item);
+  const isBook = displayType === "book";
 
   return (
     <div
       role="button"
       tabIndex={0}
       className={`w-full text-left bg-white border rounded-xl px-5 py-4 flex items-start gap-4 transition-all cursor-pointer ${
+        isBook ? "border-l-4 border-l-amber-300" : ""
+      } ${
         isSelected
           ? "border-[var(--primary)] bg-[var(--primary-light)]"
           : "border-[var(--border)] hover:border-[var(--primary)] hover:shadow-sm"
@@ -93,10 +112,10 @@ export default function ItemCard({ item, isSelected, onClick }: ItemCardProps) {
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2 mb-1">
           <span className={`text-[11px] font-semibold uppercase px-1.5 py-0.5 rounded ${TYPE_STYLES[displayType] || "bg-gray-100 text-gray-500"}`}>
-            {displayType}
+            {TYPE_LABELS[displayType] || displayType}
           </span>
           <RatingStars rating={item.value_rating} />
-          {!hasMemo && (
+          {!hasMemo && !isBook && (
             <span className="text-[10px] text-amber-600 bg-amber-50 px-1.5 py-0.5 rounded">메모 없음</span>
           )}
           <span className="text-xs text-[var(--secondary)] ml-auto">
@@ -133,7 +152,7 @@ export default function ItemCard({ item, isSelected, onClick }: ItemCardProps) {
           </div>
         ) : (
           <div className="text-[13px] text-[var(--secondary)] leading-relaxed line-clamp-2">
-            {item.summary}
+            {isBook ? plainSnippet(item.summary) : item.summary}
           </div>
         )}
 

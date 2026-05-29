@@ -1,7 +1,7 @@
 export interface Item {
   id: string;
   created_at: string;
-  type: "youtube" | "blog" | "article" | "image" | "linkedin" | "instagram";
+  type: "youtube" | "blog" | "article" | "image" | "linkedin" | "instagram" | "book";
   url: string;
   title: string;
   summary: string;

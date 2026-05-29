@@ -12,6 +12,8 @@ interface SidebarProps {
   onThreadSelect: (thread: string | null) => void;
   showUnreadOnly: boolean;
   onToggleUnread: (v: boolean) => void;
+  bookOnly: boolean;
+  onBookOnlyChange: (v: boolean) => void;
   ratingFilter: RatingFilter;
   onRatingFilterChange: (r: RatingFilter) => void;
   ratingCounts: { unrated: number; one: number; two: number; three: number };
@@ -25,12 +27,15 @@ export default function Sidebar({
   onThreadSelect,
   showUnreadOnly,
   onToggleUnread,
+  bookOnly,
+  onBookOnlyChange,
   ratingFilter,
   onRatingFilterChange,
   ratingCounts,
 }: SidebarProps) {
   const totalCount = items.length;
   const unreadCount = items.filter((i) => !i.is_read).length;
+  const bookCount = items.filter((i) => i.type === "book").length;
 
   const threadCounts: Record<string, number> = {};
   let unclassifiedCount = 0;
@@ -76,15 +81,15 @@ export default function Sidebar({
         </div>
         <button
           className={`w-full flex items-center justify-between px-3 py-2 rounded-lg text-sm transition-colors ${
-            selectedThread === null && !showUnreadOnly
+            selectedThread === null && !showUnreadOnly && !bookOnly
               ? "bg-[var(--primary-light)] text-[var(--primary)] font-medium"
               : "hover:bg-[var(--background)]"
           }`}
-          onClick={() => { onThreadSelect(null); onToggleUnread(false); }}
+          onClick={() => { onThreadSelect(null); onToggleUnread(false); onBookOnlyChange(false); }}
         >
           <span>전체 자료</span>
           <span className={`text-xs px-2 py-0.5 rounded-full ${
-            selectedThread === null && !showUnreadOnly
+            selectedThread === null && !showUnreadOnly && !bookOnly
               ? "bg-[var(--primary)]/15 text-[var(--primary)]"
               : "bg-gray-100 text-[var(--secondary)]"
           }`}>
@@ -97,7 +102,7 @@ export default function Sidebar({
               ? "bg-[var(--primary-light)] text-[var(--primary)] font-medium"
               : "hover:bg-[var(--background)]"
           }`}
-          onClick={() => { onThreadSelect(null); onToggleUnread(true); }}
+          onClick={() => { onThreadSelect(null); onToggleUnread(true); onBookOnlyChange(false); }}
         >
           <span>안 읽은 자료</span>
           <span className={`text-xs px-2 py-0.5 rounded-full ${
@@ -106,6 +111,23 @@ export default function Sidebar({
               : "bg-gray-100 text-[var(--secondary)]"
           }`}>
             {unreadCount}
+          </span>
+        </button>
+        <button
+          className={`w-full flex items-center justify-between px-3 py-2 rounded-lg text-sm transition-colors ${
+            bookOnly
+              ? "bg-[var(--primary-light)] text-[var(--primary)] font-medium"
+              : "hover:bg-[var(--background)]"
+          }`}
+          onClick={() => { onThreadSelect(null); onToggleUnread(false); onBookOnlyChange(true); }}
+        >
+          <span>📖 서재</span>
+          <span className={`text-xs px-2 py-0.5 rounded-full ${
+            bookOnly
+              ? "bg-[var(--primary)]/15 text-[var(--primary)]"
+              : "bg-gray-100 text-[var(--secondary)]"
+          }`}>
+            {bookCount}
           </span>
         </button>
       </div>
@@ -162,7 +184,7 @@ export default function Sidebar({
                 ? "bg-[var(--primary-light)] text-[var(--primary)] font-medium"
                 : "hover:bg-[var(--background)]"
             }`}
-            onClick={() => { onThreadSelect(name); onToggleUnread(false); }}
+            onClick={() => { onThreadSelect(name); onToggleUnread(false); onBookOnlyChange(false); }}
           >
             <span>{name}</span>
             <span className={`text-xs px-2 py-0.5 rounded-full ${
@@ -181,7 +203,7 @@ export default function Sidebar({
                 ? "bg-[var(--primary-light)] text-[var(--primary)] font-medium"
                 : "hover:bg-[var(--background)]"
             }`}
-            onClick={() => { onThreadSelect("__none__"); onToggleUnread(false); }}
+            onClick={() => { onThreadSelect("__none__"); onToggleUnread(false); onBookOnlyChange(false); }}
           >
             <span>미분류</span>
             <span className={`text-xs px-2 py-0.5 rounded-full ${
