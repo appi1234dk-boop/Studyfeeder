@@ -808,10 +808,12 @@ export default function DetailSidebar({ item, items = [], relatedLinks = [], onS
                       </span>
                     )}
                     <div className="flex-1 min-w-0">
-                      <div className="text-[13px] font-medium leading-snug line-clamp-2">{rel.title || "(제목 없음)"}</div>
+                      <div className="text-[13px] font-medium leading-snug line-clamp-2">
+                        {reason || rel.title || "(제목 없음)"}
+                      </div>
                       {reason && (
-                        <div className="text-[11px] text-[var(--secondary)] leading-relaxed mt-0.5 line-clamp-2">
-                          {reason}
+                        <div className="text-[11px] text-[var(--secondary)] mt-0.5 line-clamp-1">
+                          제목 : {rel.title || "(제목 없음)"}
                         </div>
                       )}
                     </div>
