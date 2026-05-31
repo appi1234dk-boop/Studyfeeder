@@ -9,6 +9,7 @@ import ItemCard from "@/components/ItemCard";
 import DetailSidebar from "@/components/DetailSidebar";
 import NoteTakingMode from "@/components/NoteTakingMode";
 import StatsView from "@/components/StatsView";
+import UnlockModal from "@/components/UnlockModal";
 
 export default function Home() {
   const [items, setItems] = useState<Item[]>([]);
@@ -25,6 +26,8 @@ export default function Home() {
   const [sortOrder, setSortOrder] = useState<"newest" | "oldest" | "rating">("newest");
   const [ratingFilter, setRatingFilter] = useState<null | "unrated" | 1 | 2 | 3>(null);
   const [noteMode, setNoteMode] = useState(false);
+  const [isOwner, setIsOwner] = useState(false);
+  const [showUnlock, setShowUnlock] = useState(false);
 
   useEffect(() => {
     fetch("/api/items")
@@ -34,6 +37,10 @@ export default function Home() {
     fetch("/api/links")
       .then((r) => r.json())
       .then((data) => setLinks(data || {}))
+      .catch(() => {});
+    fetch("/api/me")
+      .then((r) => r.json())
+      .then((data) => setIsOwner(Boolean(data?.isOwner)))
       .catch(() => {});
   }, []);
 
@@ -202,6 +209,7 @@ export default function Home() {
         allTags={allTags}
         ratingFilter={ratingFilter}
         onRatingFilterChange={setRatingFilter}
+        onLogoClick={() => setShowUnlock(true)}
       />
       <div className="flex flex-1 overflow-hidden">
         <Sidebar
@@ -353,6 +361,7 @@ export default function Home() {
             onUpdate={handleUpdate}
             onDelete={handleDelete}
             onEnterNoteMode={() => setNoteMode(true)}
+            isOwner={isOwner}
           />
         )}
       </div>
@@ -361,6 +370,14 @@ export default function Home() {
           item={selectedItem}
           onClose={() => setNoteMode(false)}
           onUpdate={handleUpdate}
+          isOwner={isOwner}
+        />
+      )}
+      {showUnlock && (
+        <UnlockModal
+          isOwner={isOwner}
+          onClose={() => setShowUnlock(false)}
+          onChange={setIsOwner}
         />
       )}
     </div>

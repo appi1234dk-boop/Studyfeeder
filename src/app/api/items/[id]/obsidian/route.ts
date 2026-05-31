@@ -1,11 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getAllItems, appendToObsidianQueue } from "@/lib/sheets";
+import { isOwner } from "@/lib/auth";
 
 export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    if (!isOwner(request)) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
     const { id } = await params;
     const body = await request.json().catch(() => ({}));
     const memo = typeof body?.memo === "string" ? body.memo.trim() : "";

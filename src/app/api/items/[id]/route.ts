@@ -1,11 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getAllItems, updateItem, deleteItem } from "@/lib/sheets";
+import { isOwner } from "@/lib/auth";
 
 export async function PATCH(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    if (!isOwner(request)) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
     const { id } = await params;
     const body = await request.json();
     const items = await getAllItems();
@@ -28,6 +32,9 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    if (!isOwner(request)) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
     const { id } = await params;
     const items = await getAllItems();
     const item = items.find((i) => i.id === id);

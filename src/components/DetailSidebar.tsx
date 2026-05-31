@@ -96,6 +96,7 @@ interface DetailSidebarProps {
   onUpdate: (id: string, updates: Partial<Item>) => void;
   onDelete: (id: string) => void;
   onEnterNoteMode?: () => void;
+  isOwner?: boolean;
 }
 
 function isLongBlackUrl(url: string): boolean {
@@ -250,7 +251,7 @@ function ImageGallery({ urls }: { urls: string[] }) {
   );
 }
 
-export default function DetailSidebar({ item, items = [], relatedLinks = [], onSelectItem, threads, onClose, onUpdate, onDelete, onEnterNoteMode }: DetailSidebarProps) {
+export default function DetailSidebar({ item, items = [], relatedLinks = [], onSelectItem, threads, onClose, onUpdate, onDelete, onEnterNoteMode, isOwner = false }: DetailSidebarProps) {
   const [title, setTitle] = useState("");
   const [ideas, setIdeas] = useState("");
   const [threadOpen, setThreadOpen] = useState(false);
@@ -369,7 +370,7 @@ export default function DetailSidebar({ item, items = [], relatedLinks = [], onS
   const youtubeId = item.type === "youtube" ? getYouTubeId(item.url) : null;
   const instagramEmbedUrl = item.url ? getInstagramEmbedUrl(item.url) : null;
   const linkedInUrl = item.url ? getLinkedInEmbedUrl(item.url) : null;
-  const canEnterNoteMode = !!(onEnterNoteMode && (youtubeId || instagramEmbedUrl || linkedInUrl));
+  const canEnterNoteMode = !!(isOwner && onEnterNoteMode && (youtubeId || instagramEmbedUrl || linkedInUrl));
 
   const noteModeButton = canEnterNoteMode ? (
     <button
@@ -412,16 +413,16 @@ export default function DetailSidebar({ item, items = [], relatedLinks = [], onS
     <div className="w-[600px] bg-white border-l border-[var(--border)] shrink-0 overflow-y-auto flex flex-col">
       {/* Header */}
       <div className="flex items-center justify-between px-5 py-4 border-b border-[var(--border)]">
-        <button
+        <span
           className={`px-3 py-1 rounded-xl text-[13px] font-medium border transition-colors ${
             item.is_read
               ? "bg-green-50 text-green-700 border-green-200"
               : "bg-[var(--primary-light)] text-[var(--primary)] border-blue-200"
-          }`}
-          onClick={() => saveField("is_read", !item.is_read)}
+          } ${isOwner ? "cursor-pointer" : ""}`}
+          onClick={isOwner ? () => saveField("is_read", !item.is_read) : undefined}
         >
           {item.is_read ? "읽음" : "안 읽음"}
-        </button>
+        </span>
         <button
           className="w-8 h-8 bg-[var(--background)] rounded-md flex items-center justify-center text-[var(--secondary)] text-base hover:bg-gray-200 transition-colors"
           onClick={onClose}
@@ -437,15 +438,20 @@ export default function DetailSidebar({ item, items = [], relatedLinks = [], onS
           <label className="text-xs font-semibold uppercase tracking-wide text-[var(--secondary)]">
             제목
           </label>
-          <input
-            className="text-lg font-semibold border border-transparent rounded-md px-2 py-1.5 outline-none hover:border-[var(--border)] focus:border-[var(--primary)] focus:bg-[var(--primary-light)] transition-colors leading-snug"
-            value={title}
-            onChange={(e) => setTitle(e.target.value)}
-            onBlur={() => { if (title !== item.title) saveField("title", title); }}
-          />
+          {isOwner ? (
+            <input
+              className="text-lg font-semibold border border-transparent rounded-md px-2 py-1.5 outline-none hover:border-[var(--border)] focus:border-[var(--primary)] focus:bg-[var(--primary-light)] transition-colors leading-snug"
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              onBlur={() => { if (title !== item.title) saveField("title", title); }}
+            />
+          ) : (
+            <div className="text-lg font-semibold px-2 py-1.5 leading-snug">{item.title}</div>
+          )}
         </div>
 
         {/* Rating */}
+        {(isOwner || item.value_rating > 0) && (
         <div className="flex flex-col gap-1.5">
           <label className="text-xs font-semibold uppercase tracking-wide text-[var(--secondary)]">
             콘텐츠 가치
@@ -454,6 +460,13 @@ export default function DetailSidebar({ item, items = [], relatedLinks = [], onS
             <div className="flex items-center gap-1">
               {[1, 2, 3].map((n) => {
                 const active = item.value_rating >= n;
+                if (!isOwner) {
+                  return (
+                    <span key={n} className={`w-8 h-8 flex items-center justify-center text-lg ${active ? "text-amber-500" : "text-gray-300"}`}>
+                      {active ? "★" : "☆"}
+                    </span>
+                  );
+                }
                 return (
                   <button
                     key={n}
@@ -502,6 +515,7 @@ export default function DetailSidebar({ item, items = [], relatedLinks = [], onS
             </div>
           )}
         </div>
+        )}
 
         {/* Ideas — only when memo exists (placed before content) */}
         {hasMemo && (
@@ -512,26 +526,33 @@ export default function DetailSidebar({ item, items = [], relatedLinks = [], onS
               </label>
               {noteModeButton}
             </div>
-            <textarea
-              className="w-full min-h-[200px] border border-[var(--border)] rounded-lg p-3 text-sm leading-relaxed outline-none resize-y focus:border-[var(--primary)] transition-colors"
-              placeholder="이 자료를 보고 느낀 점, 떠오른 아이디어, 적용할 곳을 적어보세요..."
-              value={ideas}
-              onChange={(e) => {
-                setIdeas(e.target.value);
-                if (obsidianStatus !== "idle") setObsidianStatus("idle");
-              }}
-              onBlur={() => {
-                if (ideas !== item.ideas) {
-                  saveField("ideas", ideas);
-                  requestRatingSuggestion();
-                }
-              }}
-            />
-            {renderObsidianButton()}
+            {isOwner ? (
+              <>
+                <textarea
+                  className="w-full min-h-[200px] border border-[var(--border)] rounded-lg p-3 text-sm leading-relaxed outline-none resize-y focus:border-[var(--primary)] transition-colors"
+                  placeholder="이 자료를 보고 느낀 점, 떠오른 아이디어, 적용할 곳을 적어보세요..."
+                  value={ideas}
+                  onChange={(e) => {
+                    setIdeas(e.target.value);
+                    if (obsidianStatus !== "idle") setObsidianStatus("idle");
+                  }}
+                  onBlur={() => {
+                    if (ideas !== item.ideas) {
+                      saveField("ideas", ideas);
+                      requestRatingSuggestion();
+                    }
+                  }}
+                />
+                {renderObsidianButton()}
+              </>
+            ) : (
+              <div className="text-sm leading-relaxed whitespace-pre-wrap">{item.ideas}</div>
+            )}
           </div>
         )}
 
         {/* Tags */}
+        {(isOwner || tags.length > 0) && (
         <div className="flex flex-col gap-1.5">
           <label className="text-xs font-semibold uppercase tracking-wide text-[var(--secondary)]">
             태그
@@ -540,16 +561,18 @@ export default function DetailSidebar({ item, items = [], relatedLinks = [], onS
             {tags.map((tag) => (
               <span key={tag} className="group text-[13px] px-2.5 py-1 rounded-md bg-gray-100 text-[var(--secondary)] flex items-center gap-1">
                 {tag}
-                <button
-                  className="opacity-0 group-hover:opacity-100 text-gray-400 hover:text-red-500 transition-all text-xs ml-0.5"
-                  onClick={() => removeTag(tag)}
-                  title="태그 삭제"
-                >
-                  &times;
-                </button>
+                {isOwner && (
+                  <button
+                    className="opacity-0 group-hover:opacity-100 text-gray-400 hover:text-red-500 transition-all text-xs ml-0.5"
+                    onClick={() => removeTag(tag)}
+                    title="태그 삭제"
+                  >
+                    &times;
+                  </button>
+                )}
               </span>
             ))}
-            {showTagInput ? (
+            {isOwner && (showTagInput ? (
               <input
                 className="text-[13px] px-2 py-1 border border-[var(--primary)] rounded-md outline-none w-28 bg-white"
                 placeholder="태그 입력"
@@ -569,15 +592,20 @@ export default function DetailSidebar({ item, items = [], relatedLinks = [], onS
               >
                 + 추가
               </button>
-            )}
+            ))}
           </div>
         </div>
+        )}
 
         {/* Thread */}
+        {(isOwner || item.thread) && (
         <div className="flex flex-col gap-1.5">
           <label className="text-xs font-semibold uppercase tracking-wide text-[var(--secondary)]">
             스레드
           </label>
+          {!isOwner ? (
+            <div className="px-3 py-2 text-sm">{item.thread}</div>
+          ) : (
           <div className="relative">
             <button
               className="w-full flex items-center justify-between px-3 py-2 border border-[var(--border)] rounded-lg text-sm hover:border-[var(--primary)] transition-colors"
@@ -610,7 +638,9 @@ export default function DetailSidebar({ item, items = [], relatedLinks = [], onS
               </div>
             )}
           </div>
+          )}
         </div>
+        )}
 
         {/* Original content — collapsible only when memo exists */}
         {hasMemo && (
@@ -744,7 +774,7 @@ export default function DetailSidebar({ item, items = [], relatedLinks = [], onS
         )}
 
         {/* Ideas — placed AFTER content when no memo, to encourage writing */}
-        {!hasMemo && (
+        {!hasMemo && isOwner && (
           <div className="flex flex-col gap-1.5 pt-4 border-t border-[var(--border)]">
             <div className="flex items-center justify-between gap-2">
               <label className="text-xs font-semibold uppercase tracking-wide text-[var(--secondary)]">
@@ -833,6 +863,7 @@ export default function DetailSidebar({ item, items = [], relatedLinks = [], onS
         </div>
 
         {/* Delete */}
+        {isOwner && (
         <div className="pt-4 border-t border-[var(--border)]">
           {showDeleteConfirm ? (
             <div className="flex flex-col gap-2">
@@ -861,6 +892,7 @@ export default function DetailSidebar({ item, items = [], relatedLinks = [], onS
             </button>
           )}
         </div>
+        )}
       </div>
     </div>
   );

@@ -9,9 +9,10 @@ interface NoteTakingModeProps {
   item: Item;
   onClose: () => void;
   onUpdate: (id: string, updates: Partial<Item>) => void;
+  isOwner?: boolean;
 }
 
-export default function NoteTakingMode({ item, onClose, onUpdate }: NoteTakingModeProps) {
+export default function NoteTakingMode({ item, onClose, onUpdate, isOwner = false }: NoteTakingModeProps) {
   const [ideas, setIdeas] = useState(item.ideas);
   const [ratingSuggestion, setRatingSuggestion] = useState<{ rating: number; reason: string } | null>(null);
   const [localRating, setLocalRating] = useState(item.value_rating);
@@ -197,10 +198,11 @@ export default function NoteTakingMode({ item, onClose, onUpdate }: NoteTakingMo
           </label>
           <textarea
             ref={textareaRef}
+            readOnly={!isOwner}
             className="flex-1 w-full border border-[var(--border)] rounded-lg p-3 text-sm leading-relaxed outline-none resize-none focus:border-[var(--primary)] transition-colors"
             placeholder="영상을 보면서 떠오른 생각을 자유롭게 적어보세요…"
             value={ideas}
-            onChange={(e) => setIdeas(e.target.value)}
+            onChange={(e) => { if (isOwner) setIdeas(e.target.value); }}
           />
         </div>
       </div>

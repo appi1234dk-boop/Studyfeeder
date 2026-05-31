@@ -14,6 +14,7 @@ interface TopBarProps {
   allTags: { name: string; count: number }[];
   ratingFilter: RatingFilter;
   onRatingFilterChange: (r: RatingFilter) => void;
+  onLogoClick?: () => void;
 }
 
 function FilterDropdown({
@@ -103,6 +104,7 @@ export default function TopBar({
   allTags,
   ratingFilter,
   onRatingFilterChange,
+  onLogoClick,
 }: TopBarProps) {
   const [openFilter, setOpenFilter] = useState<string | null>(null);
   const [dateFrom, setDateFrom] = useState(dateRange?.from || "");
@@ -135,7 +137,10 @@ export default function TopBar({
 
   return (
     <header className="h-14 bg-white border-b border-[var(--border)] flex items-center px-6 gap-4 shrink-0">
-      <div className="text-base font-bold text-[var(--primary)] mr-6 whitespace-nowrap">
+      <div
+        className="text-base font-bold text-[var(--primary)] mr-6 whitespace-nowrap select-none"
+        onClick={onLogoClick}
+      >
         Studyfeeder
       </div>
       <div className="flex-1 max-w-[480px] relative">

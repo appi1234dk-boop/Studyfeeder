@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { isOwner } from "@/lib/auth";
 
 const SYSTEM_PROMPT = `당신은 사용자가 작성한 메모를 보고 "이 자료의 콘텐츠 가치 점수"를 추천합니다.
 
@@ -20,6 +21,9 @@ interface AnthropicResponse {
 
 export async function POST(request: NextRequest) {
   try {
+    if (!isOwner(request)) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
     const apiKey = process.env.ANTHROPIC_API_KEY;
     if (!apiKey) {
       return NextResponse.json({ error: "ANTHROPIC_API_KEY missing" }, { status: 500 });
