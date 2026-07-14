@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import type { Item } from "@/lib/types";
 import type { RelatedLink } from "@/lib/sheets";
 import { getYouTubeId, getInstagramEmbedUrl, getLinkedInEmbedUrl } from "@/lib/embeds";
@@ -97,6 +97,21 @@ interface DetailSidebarProps {
   onDelete: (id: string) => void;
   onEnterNoteMode?: () => void;
   isOwner?: boolean;
+}
+
+const DEFAULT_SIDEBAR_WIDTH = 600;
+const MIN_SIDEBAR_WIDTH = 360;
+const MAX_SIDEBAR_WIDTH = 900;
+const MIN_LIST_WIDTH = 320;
+const SIDEBAR_WIDTH_STORAGE_KEY = "studyfeeder-detail-sidebar-width";
+
+function clampSidebarWidth(width: number): number {
+  if (typeof window === "undefined") {
+    return Math.min(MAX_SIDEBAR_WIDTH, Math.max(MIN_SIDEBAR_WIDTH, width));
+  }
+
+  const availableWidth = Math.max(MIN_SIDEBAR_WIDTH, window.innerWidth - MIN_LIST_WIDTH);
+  return Math.min(Math.min(MAX_SIDEBAR_WIDTH, availableWidth), Math.max(MIN_SIDEBAR_WIDTH, width));
 }
 
 function isLongBlackUrl(url: string): boolean {
@@ -263,6 +278,74 @@ export default function DetailSidebar({ item, items = [], relatedLinks = [], onS
   const [sessionInitialIdeas, setSessionInitialIdeas] = useState("");
   const [lastSentMemo, setLastSentMemo] = useState<string | null>(null);
   const [obsidianStatus, setObsidianStatus] = useState<"idle" | "sending" | "sent" | "error">("idle");
+  const [sidebarWidth, setSidebarWidth] = useState(DEFAULT_SIDEBAR_WIDTH);
+  const [isResizing, setIsResizing] = useState(false);
+  const resizeStart = useRef({ pointerX: 0, width: DEFAULT_SIDEBAR_WIDTH });
+
+  useEffect(() => {
+    const savedWidth = Number(window.localStorage.getItem(SIDEBAR_WIDTH_STORAGE_KEY));
+    if (Number.isFinite(savedWidth) && savedWidth > 0) {
+      setSidebarWidth(clampSidebarWidth(savedWidth));
+    }
+  }, []);
+
+  useEffect(() => {
+    const handleWindowResize = () => {
+      setSidebarWidth((width) => clampSidebarWidth(width));
+    };
+    window.addEventListener("resize", handleWindowResize);
+    return () => window.removeEventListener("resize", handleWindowResize);
+  }, []);
+
+  useEffect(() => {
+    if (!isResizing) return;
+
+    const previousCursor = document.body.style.cursor;
+    const previousUserSelect = document.body.style.userSelect;
+    document.body.style.cursor = "col-resize";
+    document.body.style.userSelect = "none";
+
+    const handlePointerMove = (event: PointerEvent) => {
+      const nextWidth = resizeStart.current.width + resizeStart.current.pointerX - event.clientX;
+      setSidebarWidth(clampSidebarWidth(nextWidth));
+    };
+    const handlePointerUp = () => setIsResizing(false);
+
+    window.addEventListener("pointermove", handlePointerMove);
+    window.addEventListener("pointerup", handlePointerUp);
+    window.addEventListener("pointercancel", handlePointerUp);
+    return () => {
+      window.removeEventListener("pointermove", handlePointerMove);
+      window.removeEventListener("pointerup", handlePointerUp);
+      window.removeEventListener("pointercancel", handlePointerUp);
+      document.body.style.cursor = previousCursor;
+      document.body.style.userSelect = previousUserSelect;
+    };
+  }, [isResizing]);
+
+  useEffect(() => {
+    if (!isResizing) {
+      window.localStorage.setItem(SIDEBAR_WIDTH_STORAGE_KEY, String(Math.round(sidebarWidth)));
+    }
+  }, [isResizing, sidebarWidth]);
+
+  const startResizing = (event: React.PointerEvent<HTMLDivElement>) => {
+    resizeStart.current = { pointerX: event.clientX, width: sidebarWidth };
+    setIsResizing(true);
+    event.preventDefault();
+  };
+
+  const resizeWithKeyboard = (event: React.KeyboardEvent<HTMLDivElement>) => {
+    if (event.key !== "ArrowLeft" && event.key !== "ArrowRight") return;
+    const direction = event.key === "ArrowLeft" ? 1 : -1;
+    const step = event.shiftKey ? 50 : 10;
+    setSidebarWidth((width) => {
+      const nextWidth = clampSidebarWidth(width + direction * step);
+      window.localStorage.setItem(SIDEBAR_WIDTH_STORAGE_KEY, String(Math.round(nextWidth)));
+      return nextWidth;
+    });
+    event.preventDefault();
+  };
 
   useEffect(() => {
     if (item) {
@@ -410,7 +493,32 @@ export default function DetailSidebar({ item, items = [], relatedLinks = [], onS
   };
 
   return (
-    <div className="w-[600px] bg-white border-l border-[var(--border)] shrink-0 overflow-y-auto flex flex-col">
+    <div
+      className="relative bg-white border-l border-[var(--border)] shrink-0 overflow-y-auto flex flex-col"
+      style={{ width: sidebarWidth }}
+    >
+      <div
+        role="separator"
+        aria-label="상세 영역 너비 조절"
+        aria-orientation="vertical"
+        aria-valuemin={MIN_SIDEBAR_WIDTH}
+        aria-valuemax={MAX_SIDEBAR_WIDTH}
+        aria-valuenow={Math.round(sidebarWidth)}
+        tabIndex={0}
+        title="드래그해서 상세 영역 너비 조절"
+        className={`group absolute inset-y-0 -left-1 z-30 w-2 cursor-col-resize touch-none outline-none ${
+          isResizing ? "bg-blue-500/15" : "hover:bg-blue-500/10 focus:bg-blue-500/10"
+        }`}
+        onPointerDown={startResizing}
+        onKeyDown={resizeWithKeyboard}
+      >
+        <span
+          aria-hidden="true"
+          className={`absolute inset-y-0 left-1/2 w-0.5 -translate-x-1/2 transition-colors ${
+            isResizing ? "bg-[var(--primary)]" : "bg-transparent group-hover:bg-[var(--primary)] group-focus:bg-[var(--primary)]"
+          }`}
+        />
+      </div>
       {/* Header */}
       <div className="flex items-center justify-between px-5 py-4 border-b border-[var(--border)]">
         <span

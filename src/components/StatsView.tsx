@@ -24,10 +24,6 @@ function getWeekRange(offset: number): { from: Date; to: Date; label: string; su
   return { from: monday, to: sunday, label: `${fmt(monday)} ~ ${fmt(sunday)}`, suffix };
 }
 
-function getDateStr(d: Date): string {
-  return d.toISOString().slice(0, 10);
-}
-
 function getMonthRange(offset: number): { from: Date; to: Date; label: string; suffix: string } {
   const now = new Date();
   const year = now.getFullYear();
@@ -39,6 +35,15 @@ function getMonthRange(offset: number): { from: Date; to: Date; label: string; s
 
   const suffix = offset === 0 ? "(이번 달)" : offset === -1 ? "(지난 달)" : "";
   return { from, to, label: `${from.getFullYear()}년 ${from.getMonth() + 1}월`, suffix };
+}
+
+function stableHash(value: string): number {
+  let hash = 2166136261;
+  for (let i = 0; i < value.length; i++) {
+    hash ^= value.charCodeAt(i);
+    hash = Math.imul(hash, 16777619);
+  }
+  return hash >>> 0;
 }
 
 export default function StatsView({ items, onTagClick }: StatsViewProps) {
@@ -79,12 +84,8 @@ export default function StatsView({ items, onTagClick }: StatsViewProps) {
       return { value, count, size, isTop3: top3.has(value), color: COLORS[i % COLORS.length] };
     });
 
-    // Fisher-Yates shuffle
-    for (let i = tags.length - 1; i > 0; i--) {
-      const j = Math.floor(Math.random() * (i + 1));
-      [tags[i], tags[j]] = [tags[j], tags[i]];
-    }
-    return tags;
+    // 태그 문자열 기반의 결정적 순서: 구름 형태는 분산시키되 재렌더 시 순서가 흔들리지 않는다.
+    return tags.sort((a, b) => stableHash(a.value) - stableHash(b.value) || a.value.localeCompare(b.value));
   }, [monthlyTagCounts]);
 
   // Weekly data
