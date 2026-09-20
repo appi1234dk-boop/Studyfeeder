@@ -255,7 +255,7 @@ export async function updateItem(
       threadId = structure.find((entry) => entry.kind === "thread" && entry.name === updates.thread)?.id || "";
     }
     requests.push({ range: `${SHEET_NAME}!R${rowIndex}`, values: [[threadId]] });
-    if (!threadId) requests.push({ range: `${SHEET_NAME}!O${rowIndex}`, values: [[""]] });
+    requests.push({ range: `${SHEET_NAME}!O${rowIndex}`, values: [[updates.thread]] });
   }
   if (updates.tags !== undefined) {
     requests.push({ range: `${SHEET_NAME}!G${rowIndex}`, values: [[updates.tags]] });
