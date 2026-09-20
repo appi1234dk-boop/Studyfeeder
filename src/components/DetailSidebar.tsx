@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef } from "react";
 import type { Item } from "@/lib/types";
+import ConfirmDialog from "@/components/ConfirmDialog";
 import type { RelatedLink } from "@/lib/sheets";
 import { getYouTubeId, getInstagramEmbedUrl, getLinkedInEmbedUrl, getDriveVideoEmbedUrl } from "@/lib/embeds";
 
@@ -532,12 +533,16 @@ export default function DetailSidebar({ item, items = [], relatedLinks = [], onS
         >
           {item.is_read ? "읽음" : "안 읽음"}
         </span>
-        <button
-          className="w-8 h-8 bg-[var(--background)] rounded-md flex items-center justify-center text-[var(--secondary)] text-base hover:bg-gray-200 transition-colors"
-          onClick={onClose}
-        >
-          &times;
-        </button>
+        <div className="flex items-center gap-1">
+          {isOwner && <button className="w-8 h-8 rounded-md flex items-center justify-center text-[var(--secondary)] hover:bg-red-50 hover:text-red-600 transition-colors" onClick={() => setShowDeleteConfirm(true)} title="자료 삭제" aria-label="자료 삭제"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M4 7h16M9 7V4h6v3M6.5 7l.8 13h9.4l.8-13M10 11v5M14 11v5" /></svg></button>}
+          <button
+            className="w-8 h-8 bg-[var(--background)] rounded-md flex items-center justify-center text-[var(--secondary)] text-base hover:bg-gray-200 transition-colors"
+            onClick={onClose}
+            aria-label="상세 닫기"
+          >
+            &times;
+          </button>
+        </div>
       </div>
 
       {/* Body */}
@@ -988,38 +993,8 @@ export default function DetailSidebar({ item, items = [], relatedLinks = [], onS
           <div className="text-[13px] text-[var(--secondary)]">{item.created_at}</div>
         </div>
 
-        {/* Delete */}
-        {isOwner && (
-        <div className="pt-4 border-t border-[var(--border)]">
-          {showDeleteConfirm ? (
-            <div className="flex flex-col gap-2">
-              <p className="text-sm text-red-600">정말 이 자료를 삭제하시겠습니까?</p>
-              <div className="flex gap-2">
-                <button
-                  className="flex-1 px-3 py-2 text-sm bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors"
-                  onClick={() => onDelete(item.id)}
-                >
-                  삭제
-                </button>
-                <button
-                  className="flex-1 px-3 py-2 text-sm border border-[var(--border)] rounded-lg hover:bg-gray-50 transition-colors"
-                  onClick={() => setShowDeleteConfirm(false)}
-                >
-                  취소
-                </button>
-              </div>
-            </div>
-          ) : (
-            <button
-              className="w-full px-3 py-2 text-sm text-red-500 border border-red-200 rounded-lg hover:bg-red-50 transition-colors"
-              onClick={() => setShowDeleteConfirm(true)}
-            >
-              자료 삭제
-            </button>
-          )}
-        </div>
-        )}
       </div>
+      <ConfirmDialog open={showDeleteConfirm} title="자료를 삭제할까요?" description="삭제한 자료는 목록에서 사라집니다." onCancel={() => setShowDeleteConfirm(false)} onConfirm={() => onDelete(item.id)} />
     </div>
   );
 }

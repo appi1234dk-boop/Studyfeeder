@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getThreadStructure, renameThreadStructureEntry, upsertThreadStructure, type ThreadStructureEntry } from "@/lib/sheets";
+import { deleteThreadStructureEntry, getThreadStructure, renameThreadStructureEntry, upsertThreadStructure, type ThreadStructureEntry } from "@/lib/sheets";
 import { isOwner } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
@@ -51,5 +51,20 @@ export async function PATCH(request: NextRequest) {
   } catch (error) {
     console.error("Failed to rename thread structure entry:", error);
     return NextResponse.json({ error: "Failed to rename entry" }, { status: 500 });
+  }
+}
+
+export async function DELETE(request: NextRequest) {
+  if (!isOwner(request)) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  try {
+    const body = await request.json();
+    const id = typeof body?.id === "string" ? body.id : "";
+    if (!id || id.length > 200) return NextResponse.json({ error: "Invalid delete request" }, { status: 400 });
+    const result = await deleteThreadStructureEntry(id);
+    if (result.status === "not_found") return NextResponse.json({ error: "Entry not found" }, { status: 404 });
+    return NextResponse.json(result);
+  } catch (error) {
+    console.error("Failed to delete thread structure entry:", error);
+    return NextResponse.json({ error: "Failed to delete entry" }, { status: 500 });
   }
 }

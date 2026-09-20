@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { Item } from "@/lib/types";
 import type { ThreadStructureEntry } from "@/lib/sheets";
+import ConfirmDialog from "@/components/ConfirmDialog";
 
 interface SidebarProps {
   items: Item[];
@@ -18,6 +19,7 @@ interface SidebarProps {
   isOwner?: boolean;
   onThreadCatalogChange?: (threads: string[]) => void;
   onThreadRename?: (oldName: string, newName: string) => void;
+  onThreadDelete?: (name: string) => void;
 }
 
 const UNCLASSIFIED = "__none__";
@@ -49,7 +51,7 @@ function DragHandle({ label, onStart, onEnd }: { label: string; onStart: () => v
   }} onDragEnd={onEnd} className="px-2 py-2 text-gray-300 hover:text-[var(--secondary)] cursor-grab active:cursor-grabbing shrink-0" aria-label={`${label} 순서 이동`} title="드래그해서 순서 변경"><svg width="17" height="14" viewBox="0 0 17 14" fill="none" aria-hidden="true"><path d="M1 3h15M1 7h15M1 11h15" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" /></svg></button>;
 }
 
-export default function Sidebar({ items, activeTab, onTabChange, selectedThreads, onThreadsChange, showUnreadOnly, onToggleUnread, selectedTypes, onTypesChange, allTypes, isOwner = false, onThreadCatalogChange, onThreadRename }: SidebarProps) {
+export default function Sidebar({ items, activeTab, onTabChange, selectedThreads, onThreadsChange, showUnreadOnly, onToggleUnread, selectedTypes, onTypesChange, allTypes, isOwner = false, onThreadCatalogChange, onThreadRename, onThreadDelete }: SidebarProps) {
   const [entries, setEntries] = useState<ThreadStructureEntry[]>([]);
   const [dragged, setDragged] = useState<DragItem | null>(null);
   const [dropTarget, setDropTarget] = useState<DropTarget | null>(null);
@@ -61,6 +63,11 @@ export default function Sidebar({ items, activeTab, onTabChange, selectedThreads
   const [renameError, setRenameError] = useState("");
   const [renaming, setRenaming] = useState(false);
   const [contextMenu, setContextMenu] = useState<ContextMenu | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<ThreadStructureEntry | null>(null);
+  const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState("");
+  const [structureLoaded, setStructureLoaded] = useState(false);
+  const persistedEntryIds = useRef<Set<string>>(new Set());
   const saveQueue = useRef<Promise<void>>(Promise.resolve());
   const [collapsed, setCollapsed] = useState<string[]>(() => {
     if (typeof window === "undefined") return [];
@@ -83,10 +90,12 @@ export default function Sidebar({ items, activeTab, onTabChange, selectedThreads
     fetch("/api/thread-structure", { cache: "no-store" }).then((response) => response.json()).then((data) => {
       if (!Array.isArray(data)) return;
       const loaded = data as ThreadStructureEntry[];
+      persistedEntryIds.current = new Set(loaded.map((entry) => entry.id));
       const configured = new Set(loaded.filter((entry) => entry.kind === "thread").map((entry) => entry.name));
       const nextOrder = Math.max(-1, ...loaded.filter((entry) => !entry.parent_id).map((entry) => entry.sort_order)) + 1;
       const missing = itemThreads.filter((name) => !configured.has(name)).map((name, index): ThreadStructureEntry => ({ kind: "thread", id: `thread:${name}`, name, parent_id: "", sort_order: nextOrder + index }));
       setEntries([...loaded, ...missing]);
+      setStructureLoaded(true);
     }).catch(() => {});
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -106,6 +115,21 @@ export default function Sidebar({ items, activeTab, onTabChange, selectedThreads
   useEffect(() => {
     onThreadCatalogChange?.(availableThreads.filter((name) => name !== UNCLASSIFIED));
   }, [availableThreads, onThreadCatalogChange]);
+
+  useEffect(() => {
+    if (!isOwner || !structureLoaded) return;
+    const unsavedIds = entries.filter((entry) => !persistedEntryIds.current.has(entry.id)).map((entry) => entry.id);
+    if (unsavedIds.length === 0) return;
+    unsavedIds.forEach((id) => persistedEntryIds.current.add(id));
+    const body = JSON.stringify({ entries });
+    saveQueue.current = saveQueue.current.catch(() => {}).then(async () => {
+      const response = await fetch("/api/thread-structure", { method: "PUT", headers: { "Content-Type": "application/json" }, body, cache: "no-store", keepalive: true });
+      if (!response.ok) {
+        unsavedIds.forEach((id) => persistedEntryIds.current.delete(id));
+        throw new Error(`Failed to save new thread entries: ${response.status}`);
+      }
+    });
+  }, [entries, isOwner, structureLoaded]);
 
   useEffect(() => {
     if (!contextMenu) return;
@@ -178,7 +202,24 @@ export default function Sidebar({ items, activeTab, onTabChange, selectedThreads
   function openContextMenu(event: React.MouseEvent, entry: ThreadStructureEntry) {
     if (!isOwner || entry.name === UNCLASSIFIED) return;
     event.preventDefault(); event.stopPropagation();
-    setContextMenu({ entry, x: Math.min(event.clientX, window.innerWidth - 170), y: Math.min(event.clientY, window.innerHeight - 60) });
+    setContextMenu({ entry, x: Math.min(event.clientX, window.innerWidth - 170), y: Math.min(event.clientY, window.innerHeight - 105) });
+  }
+
+  async function deleteEntry() {
+    if (!deleteTarget || deleting) return;
+    setDeleting(true); setDeleteError("");
+    try {
+      await saveQueue.current.catch(() => {});
+      const response = await fetch("/api/thread-structure", { method: "DELETE", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: deleteTarget.id }), cache: "no-store" });
+      if (!response.ok) throw new Error("삭제하지 못했습니다. 잠시 후 다시 시도해 주세요.");
+      setEntries((current) => current.filter((entry) => entry.id !== deleteTarget.id).map((entry) => deleteTarget.kind === "folder" && entry.parent_id === deleteTarget.id ? { ...entry, parent_id: "" } : entry));
+      if (deleteTarget.kind === "thread") onThreadDelete?.(deleteTarget.name);
+      setDeleteTarget(null);
+    } catch (error) {
+      setDeleteError(error instanceof Error ? error.message : "삭제하지 못했습니다.");
+    } finally {
+      setDeleting(false);
+    }
   }
 
   async function renameEntry() {
@@ -222,6 +263,7 @@ export default function Sidebar({ items, activeTab, onTabChange, selectedThreads
     </div>
     {showCreateModal && <div className="fixed inset-0 z-[1100] bg-black/30 flex items-center justify-center" onClick={() => setShowCreateModal(false)}><div className="w-[340px] bg-white rounded-xl p-5 shadow-xl" onClick={(event) => event.stopPropagation()}><h3 className="font-semibold mb-3">새로 만들기</h3><div className="grid grid-cols-2 gap-1 p-1 mb-3 rounded-lg bg-gray-100"><button className={`py-1.5 rounded-md text-sm ${createKind === "thread" ? "bg-white text-[var(--primary)] font-medium shadow-sm" : "text-[var(--secondary)]"}`} onClick={() => setCreateKind("thread")}>스레드</button><button className={`py-1.5 rounded-md text-sm ${createKind === "folder" ? "bg-white text-[var(--primary)] font-medium shadow-sm" : "text-[var(--secondary)]"}`} onClick={() => setCreateKind("folder")}>폴더</button></div><input autoFocus value={newEntryName} onChange={(event) => setNewEntryName(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") createEntry(); }} placeholder={createKind === "thread" ? "스레드명" : "폴더명"} className="w-full border border-[var(--border)] rounded-lg px-3 py-2 text-sm outline-none focus:border-[var(--primary)]" /><p className="mt-2 text-xs text-[var(--secondary)]">{createKind === "thread" ? "자료가 없어도 목록에 유지되며, 상세 화면에서 자료를 옮길 수 있어요." : "만든 뒤 스레드를 드래그해 폴더에 넣을 수 있어요."}</p><div className="flex justify-end gap-2 mt-4"><button className="px-3 py-1.5 text-sm" onClick={() => setShowCreateModal(false)}>취소</button><button className="px-3 py-1.5 text-sm rounded-md bg-[var(--primary)] text-white" onClick={createEntry}>만들기</button></div></div></div>}
     {renameTarget && <div className="fixed inset-0 z-[1100] bg-black/30 flex items-center justify-center" onClick={() => !renaming && setRenameTarget(null)}><div className="w-[340px] bg-white rounded-xl p-5 shadow-xl" onClick={(event) => event.stopPropagation()}><h3 className="font-semibold mb-1">{renameTarget.kind === "thread" ? "스레드" : "폴더"} 이름 변경</h3>{renameTarget.kind === "thread" && <p className="mb-3 text-xs text-[var(--secondary)]">연결된 모든 자료에도 새 이름이 적용됩니다.</p>}<input autoFocus value={renameName} onChange={(event) => { setRenameName(event.target.value); setRenameError(""); }} onKeyDown={(event) => { if (event.key === "Enter") renameEntry(); }} className="w-full border border-[var(--border)] rounded-lg px-3 py-2 text-sm outline-none focus:border-[var(--primary)]" />{renameError && <p className="mt-2 text-xs text-red-600">{renameError}</p>}<div className="flex justify-end gap-2 mt-4"><button disabled={renaming} className="px-3 py-1.5 text-sm disabled:opacity-50" onClick={() => setRenameTarget(null)}>취소</button><button disabled={renaming || !renameName.trim()} className="px-3 py-1.5 text-sm rounded-md bg-[var(--primary)] text-white disabled:opacity-50" onClick={renameEntry}>{renaming ? "변경 중…" : "변경"}</button></div></div></div>}
-    {contextMenu && <div className="fixed z-[1200] w-40 rounded-lg border border-[var(--border)] bg-white p-1 shadow-lg" style={{ left: contextMenu.x, top: contextMenu.y }} onClick={(event) => event.stopPropagation()} role="menu"><button className="w-full flex items-center gap-2 rounded-md px-3 py-2 text-sm text-left hover:bg-[var(--background)]" onClick={() => openRename(contextMenu.entry)} role="menuitem"><svg width="15" height="15" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M13.8 3.2a2.1 2.1 0 0 1 3 3L7 16l-4 .9.9-4Z" /><path d="m12.5 4.5 3 3" /></svg>이름 변경</button></div>}
+    {contextMenu && <div className="fixed z-[1200] w-40 rounded-lg border border-[var(--border)] bg-white p-1 shadow-lg" style={{ left: contextMenu.x, top: contextMenu.y }} onClick={(event) => event.stopPropagation()} role="menu"><button className="w-full flex items-center gap-2 rounded-md px-3 py-2 text-sm text-left hover:bg-[var(--background)]" onClick={() => openRename(contextMenu.entry)} role="menuitem"><svg width="15" height="15" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M13.8 3.2a2.1 2.1 0 0 1 3 3L7 16l-4 .9.9-4Z" /><path d="m12.5 4.5 3 3" /></svg>이름 변경</button><button className="w-full flex items-center gap-2 rounded-md px-3 py-2 text-sm text-left text-red-600 hover:bg-red-50" onClick={() => { setDeleteTarget(contextMenu.entry); setDeleteError(""); setContextMenu(null); }} role="menuitem"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M4 7h16M9 7V4h6v3M6.5 7l.8 13h9.4l.8-13M10 11v5M14 11v5" /></svg>삭제</button></div>}
+    <ConfirmDialog open={Boolean(deleteTarget)} title={`${deleteTarget?.kind === "folder" ? "폴더" : "스레드"}를 삭제할까요?`} description={deleteError || (deleteTarget?.kind === "folder" ? `‘${deleteTarget?.name || ""}’ 폴더만 삭제되며, 안에 있는 스레드는 최상위로 이동합니다.` : `‘${deleteTarget?.name || ""}’ 스레드가 삭제되며, 연결된 자료는 미분류로 이동합니다.`)} busy={deleting} onCancel={() => { if (!deleting) setDeleteTarget(null); }} onConfirm={deleteEntry} />
   </aside>;
 }

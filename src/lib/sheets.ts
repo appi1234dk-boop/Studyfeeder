@@ -131,6 +131,34 @@ export async function renameThreadStructureEntry(id: string, newName: string) {
   return { status: "renamed" as const, kind, oldName, newName, updatedItems };
 }
 
+export async function deleteThreadStructureEntry(id: string) {
+  const sheets = await ensureThreadStructureSheet();
+  const structureResponse = await sheets.spreadsheets.values.get({ spreadsheetId: SPREADSHEET_ID, range: `${THREAD_STRUCTURE_SHEET}!A2:E` });
+  const structureRows = (structureResponse.data.values as string[][]) || [];
+  const entryIndex = structureRows.findIndex((row) => row[1] === id);
+  if (entryIndex < 0) return { status: "not_found" as const };
+  const entry = structureRows[entryIndex];
+  const kind = entry[0] as ThreadStructureEntry["kind"];
+  const name = entry[2] || "";
+  const updates: { range: string; values: string[][] }[] = [{ range: `${THREAD_STRUCTURE_SHEET}!A${entryIndex + 2}:E${entryIndex + 2}`, values: [["", "", "", "", ""]] }];
+  let affectedItems = 0;
+  if (kind === "thread") {
+    const itemResponse = await sheets.spreadsheets.values.get({ spreadsheetId: SPREADSHEET_ID, range: `${SHEET_NAME}!O2:O` });
+    const threadRows = (itemResponse.data.values as string[][]) || [];
+    threadRows.forEach((row, index) => {
+      if ((row[0] || "") !== name) return;
+      updates.push({ range: `${SHEET_NAME}!O${index + 2}`, values: [[""]] });
+      affectedItems += 1;
+    });
+  } else {
+    structureRows.forEach((row, index) => {
+      if ((row[3] || "") === id) updates.push({ range: `${THREAD_STRUCTURE_SHEET}!D${index + 2}`, values: [[""]] });
+    });
+  }
+  await sheets.spreadsheets.values.batchUpdate({ spreadsheetId: SPREADSHEET_ID, requestBody: { valueInputOption: "RAW", data: updates } });
+  return { status: "deleted" as const, kind, name, affectedItems };
+}
+
 export type RelatedLink = { related_id: string; score: number; reason: string };
 export type LinksMap = Record<string, RelatedLink[]>;
 

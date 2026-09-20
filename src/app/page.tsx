@@ -116,6 +116,11 @@ export default function Home() {
     setSelectedThreads((current) => current?.map((name) => name === oldName ? newName : name) ?? null);
   }, []);
 
+  const handleThreadDelete = useCallback((name: string) => {
+    setItems((current) => current.map((item) => item.thread === name ? { ...item, thread: "" } : item));
+    setSelectedThreads((current) => current?.filter((thread) => thread !== name) ?? null);
+  }, []);
+
   const threadFilterOptions = useMemo(() => {
     const options = [...threads];
     if (activeItems.some((item) => !item.thread)) options.push("__none__");
@@ -261,6 +266,7 @@ export default function Home() {
           isOwner={isOwner}
           onThreadCatalogChange={handleThreadCatalogChange}
           onThreadRename={handleThreadRename}
+          onThreadDelete={handleThreadDelete}
         />
         <main className="flex-1 overflow-y-auto p-6">
           {activeTab === "items" ? (
