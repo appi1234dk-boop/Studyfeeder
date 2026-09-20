@@ -15,6 +15,7 @@ export default function Home() {
   const [items, setItems] = useState<Item[]>([]);
   const [links, setLinks] = useState<LinksMap>({});
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [activeTab, setActiveTab] = useState<"items" | "stats">("items");
   const [selectedItemId, setSelectedItemId] = useState<string | null>(null);
   const [selectedThreads, setSelectedThreads] = useState<string[] | null>(null);
@@ -30,10 +31,31 @@ export default function Home() {
   const [showUnlock, setShowUnlock] = useState(false);
 
   useEffect(() => {
+    let cancelled = false;
+    const timers: ReturnType<typeof setTimeout>[] = [];
     fetch("/api/items")
       .then((r) => r.json())
-      .then((data) => { setItems(data); setLoading(false); })
-      .catch(() => setLoading(false));
+      .then((data: Item[]) => {
+        if (cancelled || !Array.isArray(data)) return;
+        const ordered = [...data].sort((a, b) => (b.created_at || "").localeCompare(a.created_at || ""));
+        setItems(ordered.slice(0, 10));
+        setLoading(false);
+        if (ordered.length > 10) setLoadingMore(true);
+
+        const appendChunk = (offset: number) => {
+          if (cancelled || offset >= ordered.length) {
+            if (!cancelled) setLoadingMore(false);
+            return;
+          }
+          setItems((current) => {
+            const existing = new Set(current.map((item) => item.id));
+            return [...current, ...ordered.slice(offset, offset + 20).filter((item) => !existing.has(item.id))];
+          });
+          timers.push(setTimeout(() => appendChunk(offset + 20), 80));
+        };
+        timers.push(setTimeout(() => appendChunk(10), 80));
+      })
+      .catch(() => { if (!cancelled) setLoading(false); });
     fetch("/api/links")
       .then((r) => r.json())
       .then((data) => setLinks(data || {}))
@@ -42,6 +64,10 @@ export default function Home() {
       .then((r) => r.json())
       .then((data) => setIsOwner(Boolean(data?.isOwner)))
       .catch(() => {});
+    return () => {
+      cancelled = true;
+      timers.forEach(clearTimeout);
+    };
   }, []);
 
   const activeItems = useMemo(() => items.filter((i) => !i.is_archived), [items]);
@@ -193,14 +219,6 @@ export default function Home() {
     ? "검색 자료"
     : "전체 자료";
 
-  if (loading) {
-    return (
-      <div className="h-full flex items-center justify-center text-[var(--secondary)]">
-        불러오는 중...
-      </div>
-    );
-  }
-
   return (
     <div className="h-full flex flex-col">
       <TopBar
@@ -313,6 +331,14 @@ export default function Home() {
                 </div>
               )}
               <div className="flex flex-col gap-2">
+                {loading && Array.from({ length: 4 }).map((_, index) => (
+                  <div key={index} className="h-[116px] rounded-xl border border-[var(--border)] bg-white p-5 animate-pulse">
+                    <div className="h-3 w-20 rounded bg-gray-100 mb-4" />
+                    <div className="h-4 w-2/3 rounded bg-gray-100 mb-3" />
+                    <div className="h-3 w-full rounded bg-gray-100 mb-2" />
+                    <div className="h-3 w-4/5 rounded bg-gray-100" />
+                  </div>
+                ))}
                 {filteredItems.map((item) => (
                   <ItemCard
                     key={item.id}
@@ -321,9 +347,14 @@ export default function Home() {
                     onClick={() => setSelectedItemId(item.id)}
                   />
                 ))}
-                {filteredItems.length === 0 && (
+                {!loading && filteredItems.length === 0 && (
                   <div className="text-center text-[var(--secondary)] py-12">
                     자료가 없습니다
+                  </div>
+                )}
+                {loadingMore && (
+                  <div className="text-center text-xs text-[var(--secondary)] py-3">
+                    나머지 자료를 불러오는 중…
                   </div>
                 )}
               </div>
