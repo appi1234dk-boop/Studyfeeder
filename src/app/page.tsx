@@ -17,11 +17,11 @@ export default function Home() {
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<"items" | "stats">("items");
   const [selectedItemId, setSelectedItemId] = useState<string | null>(null);
-  const [selectedThread, setSelectedThread] = useState<string | null>(null);
+  const [selectedThreads, setSelectedThreads] = useState<string[] | null>(null);
   const [showUnreadOnly, setShowUnreadOnly] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
-  const [selectedTypes, setSelectedTypes] = useState<string[]>([]);
+  const [selectedTypes, setSelectedTypes] = useState<string[] | null>(null);
   const [dateRange, setDateRange] = useState<{ from: string; to: string } | null>(null);
   const [sortOrder, setSortOrder] = useState<"newest" | "oldest" | "rating">("newest");
   const [ratingFilter, setRatingFilter] = useState<null | "unrated" | 1 | 2 | 3>(null);
@@ -77,6 +77,15 @@ export default function Home() {
     return Array.from(set).sort();
   }, [activeItems]);
 
+  const threadFilterOptions = useMemo(() => {
+    const options = [...threads];
+    if (activeItems.some((item) => !item.thread)) options.push("__none__");
+    return options;
+  }, [activeItems, threads]);
+
+  const effectiveTypes = selectedTypes ?? allTypes.map((type) => type.name);
+  const effectiveThreads = selectedThreads ?? threadFilterOptions;
+
   const filteredItems = useMemo(() => {
     let result = [...activeItems];
 
@@ -84,11 +93,7 @@ export default function Home() {
       result = result.filter((i) => !i.is_read);
     }
 
-    if (selectedThread === "__none__") {
-      result = result.filter((i) => !i.thread);
-    } else if (selectedThread) {
-      result = result.filter((i) => i.thread === selectedThread);
-    }
+    result = result.filter((item) => effectiveThreads.includes(item.thread || "__none__"));
 
     if (searchQuery) {
       const q = searchQuery.toLowerCase();
@@ -107,9 +112,7 @@ export default function Home() {
       });
     }
 
-    if (selectedTypes.length > 0) {
-      result = result.filter((i) => selectedTypes.includes(i.type));
-    }
+    result = result.filter((item) => effectiveTypes.includes(item.type));
 
     if (dateRange) {
       result = result.filter((i) => {
@@ -138,7 +141,7 @@ export default function Home() {
     });
 
     return result;
-  }, [activeItems, showUnreadOnly, selectedThread, searchQuery, selectedTags, selectedTypes, dateRange, sortOrder, ratingFilter]);
+  }, [activeItems, showUnreadOnly, effectiveThreads, searchQuery, selectedTags, effectiveTypes, dateRange, sortOrder, ratingFilter]);
 
   const selectedItem = items.find((i) => i.id === selectedItemId) || null;
 
@@ -177,14 +180,15 @@ export default function Home() {
     []
   );
 
-  const hasActiveFilters = searchQuery || selectedTags.length > 0 || selectedTypes.length > 0 || dateRange || ratingFilter !== null;
+  const hasActiveFilters = searchQuery || selectedTags.length > 0 || dateRange || ratingFilter !== null;
+
+  const hasThreadFilter = effectiveThreads.length !== threadFilterOptions.length;
+  const hasTypeFilter = effectiveTypes.length !== allTypes.length;
 
   const listTitle = showUnreadOnly
     ? "안 읽은 자료"
-    : selectedThread === "__none__"
-    ? "미분류"
-    : selectedThread
-    ? selectedThread
+    : hasThreadFilter || hasTypeFilter
+    ? "선택한 자료"
     : hasActiveFilters
     ? "검색 자료"
     : "전체 자료";
@@ -216,11 +220,11 @@ export default function Home() {
           items={activeItems}
           activeTab={activeTab}
           onTabChange={setActiveTab}
-          selectedThread={selectedThread}
-          onThreadSelect={setSelectedThread}
+          selectedThreads={effectiveThreads}
+          onThreadsChange={setSelectedThreads}
           showUnreadOnly={showUnreadOnly}
           onToggleUnread={setShowUnreadOnly}
-          selectedTypes={selectedTypes}
+          selectedTypes={effectiveTypes}
           onTypesChange={setSelectedTypes}
           allTypes={allTypes}
         />
@@ -272,20 +276,6 @@ export default function Home() {
                       </button>
                     </span>
                   ))}
-                  {selectedTypes.map((type) => (
-                    <span
-                      key={type}
-                      className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs bg-purple-50 text-purple-700 border border-purple-200"
-                    >
-                      유형: {type}
-                      <button
-                        className="ml-0.5 hover:text-[var(--danger)] transition-colors"
-                        onClick={() => setSelectedTypes(selectedTypes.filter((t) => t !== type))}
-                      >
-                        ✕
-                      </button>
-                    </span>
-                  ))}
                   {dateRange && (
                     <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs bg-green-50 text-green-700 border border-green-200">
                       기간: {dateRange.from} ~ {dateRange.to}
@@ -313,7 +303,6 @@ export default function Home() {
                     onClick={() => {
                       setSearchQuery("");
                       setSelectedTags([]);
-                      setSelectedTypes([]);
                       setDateRange(null);
                       setRatingFilter(null);
                     }}
@@ -343,7 +332,7 @@ export default function Home() {
               items={activeItems}
               onTagClick={(tag) => {
                 setSelectedTags([tag]);
-                setSelectedThread(null);
+                setSelectedThreads(null);
                 setShowUnreadOnly(false);
                 setActiveTab("items");
               }}
