@@ -13,6 +13,82 @@ const SPREADSHEET_ID = process.env.GOOGLE_SHEETS_ID!;
 const SHEET_NAME = "자료";
 const OBSIDIAN_QUEUE_SHEET = "obsidian_queue";
 const LINKS_SHEET = "links";
+const THREAD_STRUCTURE_SHEET = "thread_structure";
+
+export type ThreadStructureEntry = {
+  kind: "folder" | "thread";
+  id: string;
+  name: string;
+  parent_id: string;
+  sort_order: number;
+};
+
+export async function getThreadStructure(): Promise<ThreadStructureEntry[]> {
+  const auth = getAuth();
+  const sheets = google.sheets({ version: "v4", auth });
+  try {
+    const res = await sheets.spreadsheets.values.get({
+      spreadsheetId: SPREADSHEET_ID,
+      range: `${THREAD_STRUCTURE_SHEET}!A2:E`,
+    });
+    return ((res.data.values as string[][]) || []).flatMap((row) => {
+      if ((row[0] !== "folder" && row[0] !== "thread") || !row[1] || !row[2]) return [];
+      return [{ kind: row[0], id: row[1], name: row[2], parent_id: row[3] || "", sort_order: Number(row[4]) || 0 } as ThreadStructureEntry];
+    });
+  } catch {
+    return [];
+  }
+}
+
+async function ensureThreadStructureSheet() {
+  const auth = getAuth();
+  const sheets = google.sheets({ version: "v4", auth });
+  const meta = await sheets.spreadsheets.get({ spreadsheetId: SPREADSHEET_ID });
+  const exists = meta.data.sheets?.some((sheet) => sheet.properties?.title === THREAD_STRUCTURE_SHEET);
+  if (!exists) {
+    await sheets.spreadsheets.batchUpdate({
+      spreadsheetId: SPREADSHEET_ID,
+      requestBody: { requests: [{ addSheet: { properties: { title: THREAD_STRUCTURE_SHEET } } }] },
+    });
+    await sheets.spreadsheets.values.update({
+      spreadsheetId: SPREADSHEET_ID,
+      range: `${THREAD_STRUCTURE_SHEET}!A1:E1`,
+      valueInputOption: "RAW",
+      requestBody: { values: [["kind", "id", "name", "parent_id", "sort_order"]] },
+    });
+  }
+  return sheets;
+}
+
+export async function upsertThreadStructure(entries: ThreadStructureEntry[]) {
+  const sheets = await ensureThreadStructureSheet();
+  const current = await sheets.spreadsheets.values.get({
+    spreadsheetId: SPREADSHEET_ID,
+    range: `${THREAD_STRUCTURE_SHEET}!A2:E`,
+  });
+  const rows = (current.data.values as string[][]) || [];
+  const rowById = new Map(rows.map((row, index) => [row[1], index + 2]));
+  const updates = entries.filter((entry) => rowById.has(entry.id)).map((entry) => ({
+    range: `${THREAD_STRUCTURE_SHEET}!A${rowById.get(entry.id)}:E${rowById.get(entry.id)}`,
+    values: [[entry.kind, entry.id, entry.name, entry.parent_id, String(entry.sort_order)]],
+  }));
+  if (updates.length) {
+    await sheets.spreadsheets.values.batchUpdate({
+      spreadsheetId: SPREADSHEET_ID,
+      requestBody: { valueInputOption: "RAW", data: updates },
+    });
+  }
+  const additions = entries.filter((entry) => !rowById.has(entry.id));
+  if (additions.length) {
+    await sheets.spreadsheets.values.append({
+      spreadsheetId: SPREADSHEET_ID,
+      range: `${THREAD_STRUCTURE_SHEET}!A:E`,
+      valueInputOption: "RAW",
+      insertDataOption: "INSERT_ROWS",
+      requestBody: { values: additions.map((entry) => [entry.kind, entry.id, entry.name, entry.parent_id, String(entry.sort_order)]) },
+    });
+  }
+}
 
 export type RelatedLink = { related_id: string; score: number; reason: string };
 export type LinksMap = Record<string, RelatedLink[]>;

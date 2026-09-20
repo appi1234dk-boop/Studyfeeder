@@ -227,6 +227,7 @@ export default function Home() {
           selectedTypes={effectiveTypes}
           onTypesChange={setSelectedTypes}
           allTypes={allTypes}
+          isOwner={isOwner}
         />
         <main className="flex-1 overflow-y-auto p-6">
           {activeTab === "items" ? (
