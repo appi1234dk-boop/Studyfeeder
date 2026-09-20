@@ -19,16 +19,27 @@ interface SidebarProps {
 const THREAD_ORDER_STORAGE_KEY = "studyfeeder-thread-order";
 const UNCLASSIFIED = "__none__";
 
-function SectionHeader({ title, onSelectAll, onClear }: { title: string; onSelectAll: () => void; onClear: () => void }) {
+function SectionHeader({ title }: { title: string }) {
   return (
-    <div className="flex items-center justify-between gap-2 mb-2">
-      <div className="text-[11px] font-semibold uppercase tracking-wide text-[var(--secondary)]">{title}</div>
-      <div className="flex items-center gap-1 text-[10px]">
-        <button className="text-[var(--primary)] hover:underline" onClick={onSelectAll}>전체선택</button>
-        <span className="text-gray-300">·</span>
-        <button className="text-[var(--secondary)] hover:text-[var(--danger)] hover:underline" onClick={onClear}>선택해제</button>
-      </div>
-    </div>
+    <div className="text-[11px] font-semibold uppercase tracking-wide text-[var(--secondary)] mb-1">{title}</div>
+  );
+}
+
+function FilterCheckbox({ checked, onChange }: { checked: boolean; onChange: () => void }) {
+  return (
+    <span className="relative w-4 h-4 shrink-0">
+      <input
+        type="checkbox"
+        checked={checked}
+        onChange={onChange}
+        className="peer appearance-none w-4 h-4 m-0 rounded border border-gray-300 bg-white checked:bg-[var(--primary)] checked:border-[var(--primary)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--primary)]/30 focus-visible:ring-offset-1 cursor-pointer"
+      />
+      {checked && (
+        <svg className="absolute inset-0 pointer-events-none text-white" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+          <path d="m4 8.2 2.5 2.5L12 5.4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
+      )}
+    </span>
   );
 }
 
@@ -125,33 +136,55 @@ export default function Sidebar({
 
       {allTypes.length > 0 && (
         <div className="p-4 pt-0">
-          <SectionHeader title="유형" onSelectAll={() => onTypesChange(allTypeNames)} onClear={() => onTypesChange([])} />
+          <SectionHeader title="유형" />
+          <label className="flex items-center gap-2 px-2 py-1.5 rounded-lg text-sm font-medium cursor-pointer hover:bg-[var(--background)]">
+            <FilterCheckbox
+              checked={selectedTypes.length === allTypeNames.length}
+              onChange={() => onTypesChange(selectedTypes.length === allTypeNames.length ? [] : allTypeNames)}
+            />
+            <span>전체</span>
+          </label>
+          <div className="ml-3 pl-3 border-l border-gray-100">
           {allTypes.map((type) => (
             <label key={type.name} className="flex items-center gap-2 px-2 py-1.5 rounded-lg text-sm cursor-pointer hover:bg-[var(--background)]">
-              <input type="checkbox" checked={selectedTypes.includes(type.name)} onChange={() => toggleValue(selectedTypes, type.name, onTypesChange)} className="w-4 h-4 rounded accent-[var(--primary)]" />
+              <FilterCheckbox checked={selectedTypes.includes(type.name)} onChange={() => toggleValue(selectedTypes, type.name, onTypesChange)} />
               <span className="uppercase text-[13px] flex-1">{type.name}</span><Count value={type.count} />
             </label>
           ))}
+          </div>
         </div>
       )}
 
       <div className="p-4 pt-0">
-        <SectionHeader title="스레드" onSelectAll={() => onThreadsChange(availableThreads)} onClear={() => onThreadsChange([])} />
+        <SectionHeader title="스레드" />
+        <label className="flex items-center gap-2 px-2 py-1.5 rounded-lg text-sm font-medium cursor-pointer hover:bg-[var(--background)]">
+          <FilterCheckbox
+            checked={availableThreads.length > 0 && selectedThreads.length === availableThreads.length}
+            onChange={() => onThreadsChange(selectedThreads.length === availableThreads.length ? [] : availableThreads)}
+          />
+          <span>전체</span>
+        </label>
+        <div className="ml-3 pl-3 border-l border-gray-100">
         {threadOrder.map((name) => {
           const label = name === UNCLASSIFIED ? "미분류" : name;
           return (
             <div key={name} onDragOver={(event) => event.preventDefault()} onDrop={() => moveThread(name)} className={`flex items-center gap-1 rounded-lg hover:bg-[var(--background)] ${draggedThread === name ? "opacity-45" : ""}`}>
-              <button
-                type="button" draggable onDragStart={(event) => { setDraggedThread(name); event.dataTransfer.effectAllowed = "move"; }} onDragEnd={() => setDraggedThread(null)}
-                className="px-1.5 py-2 text-gray-300 hover:text-[var(--secondary)] cursor-grab active:cursor-grabbing" aria-label={`${label} 순서 이동`} title="드래그해서 순서 변경"
-              >⋮⋮</button>
-              <label className="min-w-0 flex-1 flex items-center gap-2 py-1.5 pr-2 text-sm cursor-pointer">
-                <input type="checkbox" checked={selectedThreads.includes(name)} onChange={() => toggleValue(selectedThreads, name, onThreadsChange)} className="w-4 h-4 rounded accent-[var(--primary)] shrink-0" />
+              <label className="min-w-0 flex-1 flex items-center gap-2 py-1.5 pl-2 text-sm cursor-pointer">
+                <FilterCheckbox checked={selectedThreads.includes(name)} onChange={() => toggleValue(selectedThreads, name, onThreadsChange)} />
                 <span className="truncate flex-1" title={label}>{label}</span><Count value={threadCounts[name]} />
               </label>
+              <button
+                type="button" draggable onDragStart={(event) => { setDraggedThread(name); event.dataTransfer.effectAllowed = "move"; }} onDragEnd={() => setDraggedThread(null)}
+                className="px-2 py-2 text-gray-300 hover:text-[var(--secondary)] cursor-grab active:cursor-grabbing shrink-0" aria-label={`${label} 순서 이동`} title="드래그해서 순서 변경"
+              >
+                <svg width="17" height="14" viewBox="0 0 17 14" fill="none" aria-hidden="true">
+                  <path d="M1 3h15M1 7h15M1 11h15" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+                </svg>
+              </button>
             </div>
           );
         })}
+        </div>
       </div>
     </aside>
   );
