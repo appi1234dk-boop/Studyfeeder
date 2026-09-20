@@ -14,6 +14,7 @@ export interface Item {
   action: string;
   source: string;
   thread: string;
+  thread_id?: string;
   images: string;
   value_rating: number;
   rowIndex: number;

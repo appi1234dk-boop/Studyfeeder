@@ -21,6 +21,7 @@ export type ThreadStructureEntry = {
   name: string;
   parent_id: string;
   sort_order: number;
+  is_archived?: boolean;
 };
 
 export async function getThreadStructure(): Promise<ThreadStructureEntry[]> {
@@ -29,11 +30,11 @@ export async function getThreadStructure(): Promise<ThreadStructureEntry[]> {
   try {
     const res = await sheets.spreadsheets.values.get({
       spreadsheetId: SPREADSHEET_ID,
-      range: `${THREAD_STRUCTURE_SHEET}!A2:E`,
+      range: `${THREAD_STRUCTURE_SHEET}!A2:F`,
     });
     return ((res.data.values as string[][]) || []).flatMap((row) => {
-      if ((row[0] !== "folder" && row[0] !== "thread") || !row[1] || !row[2]) return [];
-      return [{ kind: row[0], id: row[1], name: row[2], parent_id: row[3] || "", sort_order: Number(row[4]) || 0 } as ThreadStructureEntry];
+      if ((row[0] !== "folder" && row[0] !== "thread") || !row[1] || !row[2] || row[5] === "TRUE") return [];
+      return [{ kind: row[0], id: row[1], name: row[2], parent_id: row[3] || "", sort_order: Number(row[4]) || 0, is_archived: false } as ThreadStructureEntry];
     });
   } catch {
     return [];
@@ -52,10 +53,12 @@ async function ensureThreadStructureSheet() {
     });
     await sheets.spreadsheets.values.update({
       spreadsheetId: SPREADSHEET_ID,
-      range: `${THREAD_STRUCTURE_SHEET}!A1:E1`,
+      range: `${THREAD_STRUCTURE_SHEET}!A1:F1`,
       valueInputOption: "RAW",
-      requestBody: { values: [["kind", "id", "name", "parent_id", "sort_order"]] },
+      requestBody: { values: [["kind", "id", "name", "parent_id", "sort_order", "is_archived"]] },
     });
+  } else {
+    await sheets.spreadsheets.values.update({ spreadsheetId: SPREADSHEET_ID, range: `${THREAD_STRUCTURE_SHEET}!F1`, valueInputOption: "RAW", requestBody: { values: [["is_archived"]] } });
   }
   return sheets;
 }
@@ -64,13 +67,13 @@ export async function upsertThreadStructure(entries: ThreadStructureEntry[]) {
   const sheets = await ensureThreadStructureSheet();
   const current = await sheets.spreadsheets.values.get({
     spreadsheetId: SPREADSHEET_ID,
-    range: `${THREAD_STRUCTURE_SHEET}!A2:E`,
+    range: `${THREAD_STRUCTURE_SHEET}!A2:F`,
   });
   const rows = (current.data.values as string[][]) || [];
   const rowById = new Map(rows.map((row, index) => [row[1], index + 2]));
   const updates = entries.filter((entry) => rowById.has(entry.id)).map((entry) => ({
-    range: `${THREAD_STRUCTURE_SHEET}!A${rowById.get(entry.id)}:E${rowById.get(entry.id)}`,
-    values: [[entry.kind, entry.id, entry.name, entry.parent_id, String(entry.sort_order)]],
+    range: `${THREAD_STRUCTURE_SHEET}!A${rowById.get(entry.id)}:F${rowById.get(entry.id)}`,
+    values: [[entry.kind, entry.id, entry.name, entry.parent_id, String(entry.sort_order), entry.is_archived ? "TRUE" : "FALSE"]],
   }));
   if (updates.length) {
     await sheets.spreadsheets.values.batchUpdate({
@@ -82,10 +85,10 @@ export async function upsertThreadStructure(entries: ThreadStructureEntry[]) {
   if (additions.length) {
     await sheets.spreadsheets.values.append({
       spreadsheetId: SPREADSHEET_ID,
-      range: `${THREAD_STRUCTURE_SHEET}!A:E`,
+      range: `${THREAD_STRUCTURE_SHEET}!A:F`,
       valueInputOption: "RAW",
       insertDataOption: "INSERT_ROWS",
-      requestBody: { values: additions.map((entry) => [entry.kind, entry.id, entry.name, entry.parent_id, String(entry.sort_order)]) },
+      requestBody: { values: additions.map((entry) => [entry.kind, entry.id, entry.name, entry.parent_id, String(entry.sort_order), entry.is_archived ? "TRUE" : "FALSE"]) },
     });
   }
 }
@@ -94,7 +97,7 @@ export async function renameThreadStructureEntry(id: string, newName: string) {
   const sheets = await ensureThreadStructureSheet();
   const structureResponse = await sheets.spreadsheets.values.get({
     spreadsheetId: SPREADSHEET_ID,
-    range: `${THREAD_STRUCTURE_SHEET}!A2:E`,
+    range: `${THREAD_STRUCTURE_SHEET}!A2:F`,
   });
   const structureRows = (structureResponse.data.values as string[][]) || [];
   const entryIndex = structureRows.findIndex((row) => row[1] === id);
@@ -111,19 +114,7 @@ export async function renameThreadStructureEntry(id: string, newName: string) {
     range: `${THREAD_STRUCTURE_SHEET}!C${entryIndex + 2}`,
     values: [[newName]],
   }];
-  let updatedItems = 0;
-  if (kind === "thread" && oldName !== newName) {
-    const itemResponse = await sheets.spreadsheets.values.get({
-      spreadsheetId: SPREADSHEET_ID,
-      range: `${SHEET_NAME}!O2:O`,
-    });
-    const threadRows = (itemResponse.data.values as string[][]) || [];
-    threadRows.forEach((row, index) => {
-      if ((row[0] || "") !== oldName) return;
-      updates.push({ range: `${SHEET_NAME}!O${index + 2}`, values: [[newName]] });
-      updatedItems += 1;
-    });
-  }
+  const updatedItems = 0;
   await sheets.spreadsheets.values.batchUpdate({
     spreadsheetId: SPREADSHEET_ID,
     requestBody: { valueInputOption: "RAW", data: updates },
@@ -133,24 +124,16 @@ export async function renameThreadStructureEntry(id: string, newName: string) {
 
 export async function deleteThreadStructureEntry(id: string) {
   const sheets = await ensureThreadStructureSheet();
-  const structureResponse = await sheets.spreadsheets.values.get({ spreadsheetId: SPREADSHEET_ID, range: `${THREAD_STRUCTURE_SHEET}!A2:E` });
+  const structureResponse = await sheets.spreadsheets.values.get({ spreadsheetId: SPREADSHEET_ID, range: `${THREAD_STRUCTURE_SHEET}!A2:F` });
   const structureRows = (structureResponse.data.values as string[][]) || [];
   const entryIndex = structureRows.findIndex((row) => row[1] === id);
   if (entryIndex < 0) return { status: "not_found" as const };
   const entry = structureRows[entryIndex];
   const kind = entry[0] as ThreadStructureEntry["kind"];
   const name = entry[2] || "";
-  const updates: { range: string; values: string[][] }[] = [{ range: `${THREAD_STRUCTURE_SHEET}!A${entryIndex + 2}:E${entryIndex + 2}`, values: [["", "", "", "", ""]] }];
-  let affectedItems = 0;
-  if (kind === "thread") {
-    const itemResponse = await sheets.spreadsheets.values.get({ spreadsheetId: SPREADSHEET_ID, range: `${SHEET_NAME}!O2:O` });
-    const threadRows = (itemResponse.data.values as string[][]) || [];
-    threadRows.forEach((row, index) => {
-      if ((row[0] || "") !== name) return;
-      updates.push({ range: `${SHEET_NAME}!O${index + 2}`, values: [[""]] });
-      affectedItems += 1;
-    });
-  } else {
+  const updates: { range: string; values: string[][] }[] = [{ range: `${THREAD_STRUCTURE_SHEET}!F${entryIndex + 2}`, values: [["TRUE"]] }];
+  const affectedItems = 0;
+  if (kind === "folder") {
     structureRows.forEach((row, index) => {
       if ((row[3] || "") === id) updates.push({ range: `${THREAD_STRUCTURE_SHEET}!D${index + 2}`, values: [[""]] });
     });
@@ -195,12 +178,13 @@ export async function getLinks(): Promise<LinksMap> {
 export async function getAllItems(): Promise<Item[]> {
   const auth = getAuth();
   const sheets = google.sheets({ version: "v4", auth });
-  const res = await sheets.spreadsheets.values.get({
-    spreadsheetId: SPREADSHEET_ID,
-    range: `${SHEET_NAME}!A2:Q`,
-  });
+  const [res, structure] = await Promise.all([
+    sheets.spreadsheets.values.get({ spreadsheetId: SPREADSHEET_ID, range: `${SHEET_NAME}!A2:R` }),
+    sheets.spreadsheets.values.get({ spreadsheetId: SPREADSHEET_ID, range: `${THREAD_STRUCTURE_SHEET}!A2:F` }),
+  ]);
 
   const rows = res.data.values || [];
+  const threadNames = new Map(((structure.data.values as string[][]) || []).filter((row) => row[0] === "thread" && row[1] && row[5] !== "TRUE").map((row) => [row[1], row[2] || ""]));
   return rows.map((row, i) => ({
     id: row[0] || "",
     created_at: row[1] || "",
@@ -216,7 +200,8 @@ export async function getAllItems(): Promise<Item[]> {
     ideas: row[11] || "",
     action: row[12] || "",
     source: row[13] || "",
-    thread: row[14] || "",
+    thread: row[17] ? (threadNames.get(row[17]) || "") : (row[14] || ""),
+    thread_id: row[17] || "",
     images: row[15] || "",
     value_rating: parseInt(row[16] || "0", 10) || 0,
     rowIndex: i + 2, // 1-indexed, skip header
@@ -241,6 +226,7 @@ export async function updateItem(
     ideas?: string;
     is_read?: boolean;
     thread?: string;
+    thread_id?: string;
     tags?: string;
     value_rating?: number;
   }
@@ -263,7 +249,13 @@ export async function updateItem(
     }
   }
   if (updates.thread !== undefined) {
-    requests.push({ range: `${SHEET_NAME}!O${rowIndex}`, values: [[updates.thread]] });
+    let threadId = updates.thread_id || "";
+    if (updates.thread && !threadId) {
+      const structure = await getThreadStructure();
+      threadId = structure.find((entry) => entry.kind === "thread" && entry.name === updates.thread)?.id || "";
+    }
+    requests.push({ range: `${SHEET_NAME}!R${rowIndex}`, values: [[threadId]] });
+    if (!threadId) requests.push({ range: `${SHEET_NAME}!O${rowIndex}`, values: [[""]] });
   }
   if (updates.tags !== undefined) {
     requests.push({ range: `${SHEET_NAME}!G${rowIndex}`, values: [[updates.tags]] });
