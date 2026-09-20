@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import type { Item } from "@/lib/types";
 import type { RelatedLink } from "@/lib/sheets";
-import { getYouTubeId, getInstagramEmbedUrl, getLinkedInEmbedUrl } from "@/lib/embeds";
+import { getYouTubeId, getInstagramEmbedUrl, getLinkedInEmbedUrl, getDriveVideoEmbedUrl } from "@/lib/embeds";
 
 function driveUrlToThumbnail(url: string): string {
   const m = url.match(/\/d\/([^/]+)/);
@@ -453,7 +453,8 @@ export default function DetailSidebar({ item, items = [], relatedLinks = [], onS
   const youtubeId = item.type === "youtube" ? getYouTubeId(item.url) : null;
   const instagramEmbedUrl = item.url ? getInstagramEmbedUrl(item.url) : null;
   const linkedInUrl = item.url ? getLinkedInEmbedUrl(item.url) : null;
-  const canEnterNoteMode = !!(isOwner && onEnterNoteMode && (youtubeId || instagramEmbedUrl || linkedInUrl));
+  const driveVideoUrl = item.type === "video" ? getDriveVideoEmbedUrl(item.url) : null;
+  const canEnterNoteMode = !!(isOwner && onEnterNoteMode && (youtubeId || instagramEmbedUrl || linkedInUrl || driveVideoUrl));
 
   const noteModeButton = canEnterNoteMode ? (
     <button
@@ -787,6 +788,23 @@ export default function DetailSidebar({ item, items = [], relatedLinks = [], onS
                   <iframe
                     src={`https://www.youtube.com/embed/${youtubeId}`}
                     className="w-full h-full border-none"
+                    allowFullScreen
+                  />
+                </div>
+              </div>
+            )}
+
+            {/* Uploaded Drive video */}
+            {driveVideoUrl && (
+              <div className="flex flex-col gap-1.5">
+                <label className="text-xs font-semibold uppercase tracking-wide text-[var(--secondary)]">
+                  영상
+                </label>
+                <div className="w-full aspect-video rounded-lg overflow-hidden bg-black">
+                  <iframe
+                    src={driveVideoUrl}
+                    className="w-full h-full border-none"
+                    allow="autoplay; fullscreen"
                     allowFullScreen
                   />
                 </div>

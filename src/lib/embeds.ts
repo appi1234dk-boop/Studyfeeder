@@ -16,6 +16,16 @@ export function getLinkedInEmbedUrl(url: string): string | null {
   return null;
 }
 
-export function hasVideoEmbed(url: string): boolean {
-  return !!(getYouTubeId(url) || getInstagramEmbedUrl(url) || getLinkedInEmbedUrl(url));
+export function getDriveVideoEmbedUrl(url: string): string | null {
+  const m = url.match(/drive\.google\.com\/file\/d\/([^/]+)/);
+  return m ? `https://drive.google.com/file/d/${m[1]}/preview` : null;
+}
+
+export function hasVideoEmbed(url: string, type?: string): boolean {
+  return !!(
+    getYouTubeId(url) ||
+    getInstagramEmbedUrl(url) ||
+    getLinkedInEmbedUrl(url) ||
+    (type === "video" && getDriveVideoEmbedUrl(url))
+  );
 }

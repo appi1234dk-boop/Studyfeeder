@@ -5,6 +5,7 @@ import type { Item } from "@/lib/types";
 
 const TYPE_STYLES: Record<string, string> = {
   youtube: "bg-red-50 text-red-600",
+  video: "bg-violet-50 text-violet-700",
   blog: "bg-orange-50 text-orange-600",
   article: "bg-blue-50 text-blue-600",
   image: "bg-purple-50 text-purple-600",

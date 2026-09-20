@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { Item } from "@/lib/types";
-import { getYouTubeId, getInstagramEmbedUrl, getLinkedInEmbedUrl } from "@/lib/embeds";
+import { getYouTubeId, getInstagramEmbedUrl, getLinkedInEmbedUrl, getDriveVideoEmbedUrl } from "@/lib/embeds";
 import { useDebouncedSave } from "@/lib/useDebouncedSave";
 
 interface NoteTakingModeProps {
@@ -22,6 +22,7 @@ export default function NoteTakingMode({ item, onClose, onUpdate, isOwner = fals
   const youtubeId = getYouTubeId(item.url);
   const instagramEmbedUrl = getInstagramEmbedUrl(item.url);
   const linkedInUrl = getLinkedInEmbedUrl(item.url);
+  const driveVideoUrl = item.type === "video" ? getDriveVideoEmbedUrl(item.url) : null;
 
   const requestRatingSuggestion = useCallback(async (memo: string) => {
     if (localRating > 0) return;
@@ -94,6 +95,19 @@ export default function NoteTakingMode({ item, onClose, onUpdate, isOwner = fals
   }, []);
 
   const renderEmbed = () => {
+    if (driveVideoUrl) {
+      return (
+        <div className="w-full max-w-[1100px] aspect-video rounded-lg overflow-hidden bg-black">
+          <iframe
+            key={item.id}
+            src={driveVideoUrl}
+            className="w-full h-full border-none"
+            allow="autoplay; fullscreen"
+            allowFullScreen
+          />
+        </div>
+      );
+    }
     if (youtubeId) {
       return (
         <div className="w-full max-w-[1100px] aspect-video rounded-lg overflow-hidden bg-black">
