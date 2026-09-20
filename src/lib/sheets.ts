@@ -90,6 +90,47 @@ export async function upsertThreadStructure(entries: ThreadStructureEntry[]) {
   }
 }
 
+export async function renameThreadStructureEntry(id: string, newName: string) {
+  const sheets = await ensureThreadStructureSheet();
+  const structureResponse = await sheets.spreadsheets.values.get({
+    spreadsheetId: SPREADSHEET_ID,
+    range: `${THREAD_STRUCTURE_SHEET}!A2:E`,
+  });
+  const structureRows = (structureResponse.data.values as string[][]) || [];
+  const entryIndex = structureRows.findIndex((row) => row[1] === id);
+  if (entryIndex < 0) return { status: "not_found" as const };
+
+  const entry = structureRows[entryIndex];
+  const kind = entry[0] as ThreadStructureEntry["kind"];
+  const oldName = entry[2] || "";
+  if (structureRows.some((row, index) => index !== entryIndex && row[0] === kind && row[2] === newName)) {
+    return { status: "duplicate" as const };
+  }
+
+  const updates: { range: string; values: string[][] }[] = [{
+    range: `${THREAD_STRUCTURE_SHEET}!C${entryIndex + 2}`,
+    values: [[newName]],
+  }];
+  let updatedItems = 0;
+  if (kind === "thread" && oldName !== newName) {
+    const itemResponse = await sheets.spreadsheets.values.get({
+      spreadsheetId: SPREADSHEET_ID,
+      range: `${SHEET_NAME}!O2:O`,
+    });
+    const threadRows = (itemResponse.data.values as string[][]) || [];
+    threadRows.forEach((row, index) => {
+      if ((row[0] || "") !== oldName) return;
+      updates.push({ range: `${SHEET_NAME}!O${index + 2}`, values: [[newName]] });
+      updatedItems += 1;
+    });
+  }
+  await sheets.spreadsheets.values.batchUpdate({
+    spreadsheetId: SPREADSHEET_ID,
+    requestBody: { valueInputOption: "RAW", data: updates },
+  });
+  return { status: "renamed" as const, kind, oldName, newName, updatedItems };
+}
+
 export type RelatedLink = { related_id: string; score: number; reason: string };
 export type LinksMap = Record<string, RelatedLink[]>;
 

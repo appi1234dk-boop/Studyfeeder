@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getThreadStructure, upsertThreadStructure, type ThreadStructureEntry } from "@/lib/sheets";
+import { getThreadStructure, renameThreadStructureEntry, upsertThreadStructure, type ThreadStructureEntry } from "@/lib/sheets";
 import { isOwner } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
@@ -32,5 +32,24 @@ export async function PUT(request: NextRequest) {
   } catch (error) {
     console.error("Failed to update thread structure:", error);
     return NextResponse.json({ error: "Failed to update thread structure" }, { status: 500 });
+  }
+}
+
+export async function PATCH(request: NextRequest) {
+  if (!isOwner(request)) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  try {
+    const body = await request.json();
+    const id = typeof body?.id === "string" ? body.id : "";
+    const name = typeof body?.name === "string" ? body.name.trim() : "";
+    if (!id || id.length > 200 || !name || name.length > 100) {
+      return NextResponse.json({ error: "Invalid rename request" }, { status: 400 });
+    }
+    const result = await renameThreadStructureEntry(id, name);
+    if (result.status === "not_found") return NextResponse.json({ error: "Entry not found" }, { status: 404 });
+    if (result.status === "duplicate") return NextResponse.json({ error: "Duplicate name" }, { status: 409 });
+    return NextResponse.json(result);
+  } catch (error) {
+    console.error("Failed to rename thread structure entry:", error);
+    return NextResponse.json({ error: "Failed to rename entry" }, { status: 500 });
   }
 }
