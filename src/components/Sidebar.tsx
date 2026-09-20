@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { Item } from "@/lib/types";
 import type { ThreadStructureEntry } from "@/lib/sheets";
 
@@ -16,6 +16,7 @@ interface SidebarProps {
   onTypesChange: (types: string[]) => void;
   allTypes: { name: string; count: number }[];
   isOwner?: boolean;
+  onThreadCatalogChange?: (threads: string[]) => void;
 }
 
 const UNCLASSIFIED = "__none__";
@@ -46,12 +47,14 @@ function DragHandle({ label, onStart, onEnd }: { label: string; onStart: () => v
   }} onDragEnd={onEnd} className="px-2 py-2 text-gray-300 hover:text-[var(--secondary)] cursor-grab active:cursor-grabbing shrink-0" aria-label={`${label} 순서 이동`} title="드래그해서 순서 변경"><svg width="17" height="14" viewBox="0 0 17 14" fill="none" aria-hidden="true"><path d="M1 3h15M1 7h15M1 11h15" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" /></svg></button>;
 }
 
-export default function Sidebar({ items, activeTab, onTabChange, selectedThreads, onThreadsChange, showUnreadOnly, onToggleUnread, selectedTypes, onTypesChange, allTypes, isOwner = false }: SidebarProps) {
+export default function Sidebar({ items, activeTab, onTabChange, selectedThreads, onThreadsChange, showUnreadOnly, onToggleUnread, selectedTypes, onTypesChange, allTypes, isOwner = false, onThreadCatalogChange }: SidebarProps) {
   const [entries, setEntries] = useState<ThreadStructureEntry[]>([]);
   const [dragged, setDragged] = useState<DragItem | null>(null);
   const [dropTarget, setDropTarget] = useState<DropTarget | null>(null);
-  const [showFolderModal, setShowFolderModal] = useState(false);
-  const [folderName, setFolderName] = useState("");
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [createKind, setCreateKind] = useState<"thread" | "folder">("thread");
+  const [newEntryName, setNewEntryName] = useState("");
+  const saveQueue = useRef<Promise<void>>(Promise.resolve());
   const [collapsed, setCollapsed] = useState<string[]>(() => {
     if (typeof window === "undefined") return [];
     try { return JSON.parse(window.localStorage.getItem(COLLAPSED_STORAGE_KEY) || "[]"); } catch { return []; }
@@ -62,16 +65,20 @@ export default function Sidebar({ items, activeTab, onTabChange, selectedThreads
     for (const item of items) counts[item.thread || UNCLASSIFIED] = (counts[item.thread || UNCLASSIFIED] || 0) + 1;
     return counts;
   }, [items]);
-  const availableThreads = useMemo(() => Object.keys(threadCounts), [threadCounts]);
-  const signature = availableThreads.slice().sort().join("\u0000");
+  const itemThreads = useMemo(() => Object.keys(threadCounts), [threadCounts]);
+  const availableThreads = useMemo(() => Array.from(new Set([
+    ...entries.filter((entry) => entry.kind === "thread").map((entry) => entry.name),
+    ...itemThreads,
+  ])), [entries, itemThreads]);
+  const signature = itemThreads.slice().sort().join("\u0000");
 
   useEffect(() => {
-    fetch("/api/thread-structure").then((response) => response.json()).then((data) => {
+    fetch("/api/thread-structure", { cache: "no-store" }).then((response) => response.json()).then((data) => {
       if (!Array.isArray(data)) return;
       const loaded = data as ThreadStructureEntry[];
       const configured = new Set(loaded.filter((entry) => entry.kind === "thread").map((entry) => entry.name));
       const nextOrder = Math.max(-1, ...loaded.filter((entry) => !entry.parent_id).map((entry) => entry.sort_order)) + 1;
-      const missing = availableThreads.filter((name) => !configured.has(name)).map((name, index): ThreadStructureEntry => ({ kind: "thread", id: `thread:${name}`, name, parent_id: "", sort_order: nextOrder + index }));
+      const missing = itemThreads.filter((name) => !configured.has(name)).map((name, index): ThreadStructureEntry => ({ kind: "thread", id: `thread:${name}`, name, parent_id: "", sort_order: nextOrder + index }));
       setEntries([...loaded, ...missing]);
     }).catch(() => {});
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -80,23 +87,36 @@ export default function Sidebar({ items, activeTab, onTabChange, selectedThreads
   useEffect(() => {
     setEntries((current) => {
       const folders = current.filter((entry) => entry.kind === "folder");
-      const knownThreads = current.filter((entry) => entry.kind === "thread" && availableThreads.includes(entry.name));
+      const knownThreads = current.filter((entry) => entry.kind === "thread");
       const knownNames = new Set(knownThreads.map((entry) => entry.name));
       const nextOrder = Math.max(-1, ...current.filter((entry) => !entry.parent_id).map((entry) => entry.sort_order)) + 1;
-      const additions = availableThreads.filter((name) => !knownNames.has(name)).map((name, index): ThreadStructureEntry => ({ kind: "thread", id: `thread:${name}`, name, parent_id: "", sort_order: nextOrder + index }));
+      const additions = itemThreads.filter((name) => !knownNames.has(name)).map((name, index): ThreadStructureEntry => ({ kind: "thread", id: `thread:${name}`, name, parent_id: "", sort_order: nextOrder + index }));
       return [...folders, ...knownThreads, ...additions];
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [signature]);
 
-  const folders = entries.filter((entry) => entry.kind === "folder").sort((a, b) => a.sort_order - b.sort_order);
+  useEffect(() => {
+    onThreadCatalogChange?.(availableThreads.filter((name) => name !== UNCLASSIFIED));
+  }, [availableThreads, onThreadCatalogChange]);
+
   const rootItems = entries.filter((entry) => !entry.parent_id).sort((a, b) => a.sort_order - b.sort_order);
   const allTypeNames = allTypes.map((type) => type.name);
   const allSelected = !showUnreadOnly && selectedTypes.length === allTypeNames.length && selectedThreads.length === availableThreads.length;
 
   function persist(next: ThreadStructureEntry[]) {
     setEntries(next);
-    fetch("/api/thread-structure", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ entries: next }) }).catch(() => {});
+    const body = JSON.stringify({ entries: next });
+    saveQueue.current = saveQueue.current.catch(() => {}).then(async () => {
+      const response = await fetch("/api/thread-structure", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body,
+        cache: "no-store",
+        keepalive: true,
+      });
+      if (!response.ok) throw new Error(`Failed to save thread structure: ${response.status}`);
+    });
   }
 
   function moveEntry(targetParent: string, beforeId?: string) {
@@ -123,11 +143,11 @@ export default function Sidebar({ items, activeTab, onTabChange, selectedThreads
     window.localStorage.setItem(COLLAPSED_STORAGE_KEY, JSON.stringify(next));
   }
 
-  function createFolder() {
-    const name = folderName.trim();
-    if (!name || folders.some((folder) => folder.name === name)) return;
-    const next = [...entries, { kind: "folder", id: `folder:${crypto.randomUUID()}`, name, parent_id: "", sort_order: rootItems.length } as ThreadStructureEntry];
-    persist(next); setFolderName(""); setShowFolderModal(false);
+  function createEntry() {
+    const name = newEntryName.trim();
+    if (!name || entries.some((entry) => entry.kind === createKind && entry.name === name)) return;
+    const next = [...entries, { kind: createKind, id: `${createKind}:${crypto.randomUUID()}`, name, parent_id: "", sort_order: rootItems.length } as ThreadStructureEntry];
+    persist(next); setNewEntryName(""); setShowCreateModal(false);
   }
 
   function renderThread(entry: ThreadStructureEntry, nested = false) {
@@ -143,9 +163,9 @@ export default function Sidebar({ items, activeTab, onTabChange, selectedThreads
     <div className="flex border-b border-[var(--border)]">{(["items", "stats"] as const).map((tab) => <button key={tab} className={`flex-1 py-3 text-sm font-medium border-b-2 ${activeTab === tab ? "text-[var(--primary)] border-[var(--primary)]" : "text-[var(--secondary)] border-transparent"}`} onClick={() => onTabChange(tab)}>{tab === "items" ? "자료" : "통계"}</button>)}</div>
     <div className="p-4"><div className="text-[11px] font-semibold uppercase tracking-wide text-[var(--secondary)] mb-2">전체</div><button className={`w-full flex items-center justify-between px-3 py-2 rounded-lg text-sm ${allSelected ? "bg-[var(--primary-light)] text-[var(--primary)] font-medium" : "hover:bg-[var(--background)]"}`} onClick={() => { onTypesChange(allTypeNames); onThreadsChange(availableThreads); onToggleUnread(false); }}><span>전체 자료</span><Count value={items.length} /></button><button className={`w-full flex items-center justify-between px-3 py-2 rounded-lg text-sm ${showUnreadOnly ? "bg-[var(--primary-light)] text-[var(--primary)] font-medium" : "hover:bg-[var(--background)]"}`} onClick={() => onToggleUnread(!showUnreadOnly)}><span>안 읽은 자료</span><Count value={items.filter((item) => !item.is_read).length} /></button></div>
     {allTypes.length > 0 && <div className="p-4 pt-0"><div className="text-[11px] font-semibold uppercase tracking-wide text-[var(--secondary)] mb-1">유형</div><label className="flex items-center gap-2 px-2 py-1.5 text-sm font-medium cursor-pointer"><FilterCheckbox checked={selectedTypes.length === allTypeNames.length} onChange={() => onTypesChange(selectedTypes.length === allTypeNames.length ? [] : allTypeNames)} /><span>전체</span></label><div className="ml-3 pl-3 border-l border-gray-100">{allTypes.map((type) => <label key={type.name} className="flex items-center gap-2 px-2 py-1.5 rounded-lg text-sm cursor-pointer hover:bg-[var(--background)]"><FilterCheckbox checked={selectedTypes.includes(type.name)} onChange={() => toggleValue(selectedTypes, type.name, onTypesChange)} /><span className="uppercase text-[13px] flex-1">{type.name}</span><Count value={type.count} /></label>)}</div></div>}
-    <div className="p-4 pt-0"><div className="text-[11px] font-semibold uppercase tracking-wide text-[var(--secondary)] mb-1">스레드</div><div className={`flex items-center rounded-lg border transition-colors ${dropTarget?.kind === "root" ? "border-blue-400 bg-blue-50" : "border-transparent"}`} onDragOver={(event) => { event.preventDefault(); setDropTarget({ kind: "root", id: "root" }); }} onDragLeave={(event) => { if (!event.currentTarget.contains(event.relatedTarget as Node)) setDropTarget(null); }} onDrop={() => moveEntry("")}><label className="flex-1 flex items-center gap-2 px-2 py-1.5 text-sm font-medium cursor-pointer"><FilterCheckbox checked={availableThreads.length > 0 && selectedThreads.length === availableThreads.length} onChange={() => onThreadsChange(selectedThreads.length === availableThreads.length ? [] : availableThreads)} /><span>전체</span></label>{isOwner && <button className="w-7 h-7 rounded-md text-lg text-[var(--primary)] hover:bg-[var(--primary-light)]" onClick={() => setShowFolderModal(true)} title="폴더 추가" aria-label="스레드 폴더 추가">+</button>}</div>
+    <div className="p-4 pt-0"><div className="text-[11px] font-semibold uppercase tracking-wide text-[var(--secondary)] mb-1">스레드</div><div className={`flex items-center rounded-lg border transition-colors ${dropTarget?.kind === "root" ? "border-blue-400 bg-blue-50" : "border-transparent"}`} onDragOver={(event) => { event.preventDefault(); setDropTarget({ kind: "root", id: "root" }); }} onDragLeave={(event) => { if (!event.currentTarget.contains(event.relatedTarget as Node)) setDropTarget(null); }} onDrop={() => moveEntry("")}><label className="flex-1 flex items-center gap-2 px-2 py-1.5 text-sm font-medium cursor-pointer"><FilterCheckbox checked={availableThreads.length > 0 && selectedThreads.length === availableThreads.length} onChange={() => onThreadsChange(selectedThreads.length === availableThreads.length ? [] : availableThreads)} /><span>전체</span></label>{isOwner && <button className="w-7 h-7 rounded-md text-lg text-[var(--primary)] hover:bg-[var(--primary-light)]" onClick={() => { setCreateKind("thread"); setShowCreateModal(true); }} title="스레드 또는 폴더 추가" aria-label="스레드 또는 폴더 추가">+</button>}</div>
       <div className="ml-3 pl-3 border-l border-gray-100">{rootItems.map((entry) => entry.kind === "thread" ? renderThread(entry) : <div key={entry.id} onDragOver={(event) => { event.preventDefault(); setDropTarget({ kind: dragged?.kind === "thread" ? "folder" : "line", id: entry.id }); }} onDragLeave={(event) => { if (!event.currentTarget.contains(event.relatedTarget as Node)) setDropTarget(null); }} onDrop={() => { if (dragged?.kind === "thread") moveEntry(entry.id); else moveEntry("", entry.id); }} className={`relative ${dragged?.id === entry.id ? "opacity-45" : ""}`}>{dropTarget?.kind === "line" && dropTarget.id === entry.id && <span className="absolute -top-[2px] left-1 right-1 z-10 h-0.5 rounded-full bg-blue-500" />}<div data-drag-row className={`flex items-center gap-1 rounded-lg border transition-all ${dropTarget?.kind === "folder" && dropTarget.id === entry.id ? "border-blue-400 bg-blue-100 shadow-sm" : "border-transparent hover:bg-[var(--background)]"}`}><button className="flex-1 min-w-0 flex items-center gap-2 px-2 py-1.5 text-sm font-medium text-left" onClick={() => toggleFolder(entry.id)}><svg className="w-[18px] h-[18px] shrink-0 text-sky-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M3.5 6.5h6l2 2h9a1.5 1.5 0 0 1 1.5 1.5v8.5a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2v-10a2 2 0 0 1 1.5-2Z" /><path d="M2.5 10h19" /></svg><span className="truncate flex-1">{entry.name}</span><svg className="w-4 h-4 shrink-0 text-[var(--secondary)]" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d={collapsed.includes(entry.id) ? "m5.5 7.5 4.5 4.5 4.5-4.5" : "m5.5 12.5 4.5-4.5 4.5 4.5"} /></svg></button>{isOwner && <DragHandle label={entry.name} onStart={() => setDragged({ kind: "folder", id: entry.id })} onEnd={() => { setDragged(null); setDropTarget(null); }} />}</div>{!collapsed.includes(entry.id) && entries.filter((child) => child.kind === "thread" && child.parent_id === entry.id).sort((a, b) => a.sort_order - b.sort_order).map((child) => renderThread(child, true))}</div>)}</div>
     </div>
-    {showFolderModal && <div className="fixed inset-0 z-[1100] bg-black/30 flex items-center justify-center" onClick={() => setShowFolderModal(false)}><div className="w-[340px] bg-white rounded-xl p-5 shadow-xl" onClick={(event) => event.stopPropagation()}><h3 className="font-semibold mb-3">새 스레드 폴더</h3><input autoFocus value={folderName} onChange={(event) => setFolderName(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") createFolder(); }} placeholder="폴더명" className="w-full border border-[var(--border)] rounded-lg px-3 py-2 text-sm outline-none focus:border-[var(--primary)]" /><div className="flex justify-end gap-2 mt-4"><button className="px-3 py-1.5 text-sm" onClick={() => setShowFolderModal(false)}>취소</button><button className="px-3 py-1.5 text-sm rounded-md bg-[var(--primary)] text-white" onClick={createFolder}>만들기</button></div></div></div>}
+    {showCreateModal && <div className="fixed inset-0 z-[1100] bg-black/30 flex items-center justify-center" onClick={() => setShowCreateModal(false)}><div className="w-[340px] bg-white rounded-xl p-5 shadow-xl" onClick={(event) => event.stopPropagation()}><h3 className="font-semibold mb-3">새로 만들기</h3><div className="grid grid-cols-2 gap-1 p-1 mb-3 rounded-lg bg-gray-100"><button className={`py-1.5 rounded-md text-sm ${createKind === "thread" ? "bg-white text-[var(--primary)] font-medium shadow-sm" : "text-[var(--secondary)]"}`} onClick={() => setCreateKind("thread")}>스레드</button><button className={`py-1.5 rounded-md text-sm ${createKind === "folder" ? "bg-white text-[var(--primary)] font-medium shadow-sm" : "text-[var(--secondary)]"}`} onClick={() => setCreateKind("folder")}>폴더</button></div><input autoFocus value={newEntryName} onChange={(event) => setNewEntryName(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") createEntry(); }} placeholder={createKind === "thread" ? "스레드명" : "폴더명"} className="w-full border border-[var(--border)] rounded-lg px-3 py-2 text-sm outline-none focus:border-[var(--primary)]" /><p className="mt-2 text-xs text-[var(--secondary)]">{createKind === "thread" ? "자료가 없어도 목록에 유지되며, 상세 화면에서 자료를 옮길 수 있어요." : "만든 뒤 스레드를 드래그해 폴더에 넣을 수 있어요."}</p><div className="flex justify-end gap-2 mt-4"><button className="px-3 py-1.5 text-sm" onClick={() => setShowCreateModal(false)}>취소</button><button className="px-3 py-1.5 text-sm rounded-md bg-[var(--primary)] text-white" onClick={createEntry}>만들기</button></div></div></div>}
   </aside>;
 }

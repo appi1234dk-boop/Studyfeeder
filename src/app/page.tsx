@@ -19,6 +19,7 @@ export default function Home() {
   const [activeTab, setActiveTab] = useState<"items" | "stats">("items");
   const [selectedItemId, setSelectedItemId] = useState<string | null>(null);
   const [selectedThreads, setSelectedThreads] = useState<string[] | null>(null);
+  const [managedThreads, setManagedThreads] = useState<string[]>([]);
   const [showUnreadOnly, setShowUnreadOnly] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
@@ -96,12 +97,19 @@ export default function Home() {
   }, [activeItems]);
 
   const threads = useMemo(() => {
-    const set = new Set<string>();
+    const set = new Set<string>(managedThreads);
     for (const item of activeItems) {
       if (item.thread) set.add(item.thread);
     }
     return Array.from(set).sort();
-  }, [activeItems]);
+  }, [activeItems, managedThreads]);
+
+  const handleThreadCatalogChange = useCallback((next: string[]) => {
+    setManagedThreads((current) => {
+      const normalized = [...next].sort();
+      return current.length === normalized.length && current.every((name, index) => name === normalized[index]) ? current : normalized;
+    });
+  }, []);
 
   const threadFilterOptions = useMemo(() => {
     const options = [...threads];
@@ -246,6 +254,7 @@ export default function Home() {
           onTypesChange={setSelectedTypes}
           allTypes={allTypes}
           isOwner={isOwner}
+          onThreadCatalogChange={handleThreadCatalogChange}
         />
         <main className="flex-1 overflow-y-auto p-6">
           {activeTab === "items" ? (

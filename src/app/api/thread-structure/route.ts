@@ -2,9 +2,13 @@ import { NextRequest, NextResponse } from "next/server";
 import { getThreadStructure, upsertThreadStructure, type ThreadStructureEntry } from "@/lib/sheets";
 import { isOwner } from "@/lib/auth";
 
+export const dynamic = "force-dynamic";
+
 export async function GET() {
   try {
-    return NextResponse.json(await getThreadStructure());
+    return NextResponse.json(await getThreadStructure(), {
+      headers: { "Cache-Control": "no-store, no-cache, must-revalidate" },
+    });
   } catch (error) {
     console.error("Failed to fetch thread structure:", error);
     return NextResponse.json({ error: "Failed to fetch thread structure" }, { status: 500 });
